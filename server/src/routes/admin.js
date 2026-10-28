@@ -1,35 +1,38 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
-import { all, get, insert, update, remove, audit, getSettings, setSetting } from '../db.js';
+import { all, get, insert, update, remove, audit, getSettings, setSetting, daysAgo } from '../db.js';
 import { requireModule, requireRole, ROLES } from '../auth.js';
 
 const r = Router();
 
 // ---------- Dashboard ----------
-r.get('/dashboard', requireModule('dashboard'), (req, res) => {
+r.get('/dashboard', requireModule('dashboard'), async (req, res) => {
   const today = new Date().toISOString().slice(0, 10);
-  const rooms = all('SELECT status, COUNT(*) AS c FROM rooms GROUP BY status');
+  const c = async (sql, p) => (await get(sql, p)).c;
+  const v = async (sql, p) => (await get(sql, p)).v;
+  const rooms = await all('SELECT status, COUNT(*) AS c FROM rooms GROUP BY status');
   const totalRooms = rooms.reduce((a, x) => a + x.c, 0);
   const occupied = rooms.find((x) => x.status === 'occupied')?.c || 0;
-  const arrivals = get("SELECT COUNT(*) AS c FROM bookings WHERE check_in=? AND status IN ('pending','confirmed')", [today]).c;
-  const departures = get("SELECT COUNT(*) AS c FROM bookings WHERE check_out=? AND status='checked_in'", [today]).c;
-  const pendingWeb = get("SELECT COUNT(*) AS c FROM bookings WHERE status='pending'").c;
-  const revToday = get('SELECT COALESCE(SUM(amount),0) AS v FROM payments WHERE date(created_at)=?', [today]).v;
-  const revMonth = get("SELECT COALESCE(SUM(total),0) AS v FROM invoices WHERE strftime('%Y-%m', date)=strftime('%Y-%m','now')").v;
-  const openOrders = get("SELECT COUNT(*) AS c FROM orders WHERE status IN ('open','billed')").c;
-  const ordersToday = get("SELECT COUNT(*) AS c, COALESCE(SUM(total),0) AS v FROM orders WHERE date(created_at)=? AND status!='cancelled'", [today]);
-  const lowStock = get('SELECT COUNT(*) AS c FROM inventory_items WHERE active=1 AND qty_on_hand<=reorder_level').c;
-  const hkPending = get("SELECT COUNT(*) AS c FROM housekeeping_tasks WHERE status!='done'").c;
-  const staffPresent = get("SELECT COUNT(*) AS c FROM attendance WHERE date=? AND status IN ('present','half_day')", [today]).c;
-  const staffTotal = get("SELECT COUNT(*) AS c FROM employees WHERE status='active'").c;
-  const pendingLeaves = get("SELECT COUNT(*) AS c FROM leaves WHERE status='pending'").c;
-  const empties = get('SELECT COALESCE(SUM(empties_on_hand),0) AS c, COALESCE(SUM(empties_on_hand*bottle_deposit),0) AS v FROM inventory_items WHERE returnable_bottle=1');
-  const revenue14 = all(`SELECT date, SUM(CASE WHEN type='room' THEN total ELSE 0 END) AS room, SUM(CASE WHEN type IN ('restaurant','bar') THEN total ELSE 0 END) AS fnb FROM invoices WHERE date >= date('now','-13 days') GROUP BY date ORDER BY date`);
-  const occupancy14 = all(`WITH RECURSIVE days(d) AS (SELECT date('now','-13 days') UNION ALL SELECT date(d,'+1 day') FROM days WHERE d < date('now'))
-     SELECT d AS date, (SELECT COUNT(*) FROM bookings b WHERE b.status IN ('checked_in','checked_out','confirmed') AND b.check_in<=d AND b.check_out>d) AS occupied FROM days`);
-  const arrivalsList = all("SELECT b.id, b.code, g.name AS guest_name, rt.name AS room_type_name, r.number AS room_number, b.status, b.nights FROM bookings b JOIN guests g ON g.id=b.guest_id JOIN room_types rt ON rt.id=b.room_type_id LEFT JOIN rooms r ON r.id=b.room_id WHERE b.check_in=? AND b.status IN ('pending','confirmed') ORDER BY b.id", [today]);
-  const departuresList = all("SELECT b.id, b.code, g.name AS guest_name, r.number AS room_number, b.total, (SELECT COALESCE(SUM(amount),0) FROM payments WHERE booking_id=b.id) AS paid FROM bookings b JOIN guests g ON g.id=b.guest_id LEFT JOIN rooms r ON r.id=b.room_id WHERE b.check_out=? AND b.status='checked_in'", [today]);
-  const recentActivity = all('SELECT * FROM audit_log ORDER BY id DESC LIMIT 12');
+  const arrivals = await c("SELECT COUNT(*) AS c FROM bookings WHERE check_in=? AND status IN ('pending','confirmed')", [today]);
+  const departures = await c("SELECT COUNT(*) AS c FROM bookings WHERE check_out=? AND status='checked_in'", [today]);
+  const pendingWeb = await c("SELECT COUNT(*) AS c FROM bookings WHERE status='pending'");
+  const revToday = await v('SELECT COALESCE(SUM(amount),0) AS v FROM payments WHERE substr(created_at,1,10)=?', [today]);
+  const revMonth = await v('SELECT COALESCE(SUM(total),0) AS v FROM invoices WHERE substr(date,1,7)=?', [today.slice(0, 7)]);
+  const openOrders = await c("SELECT COUNT(*) AS c FROM orders WHERE status IN ('open','billed')");
+  const ordersToday = await get("SELECT COUNT(*) AS c, COALESCE(SUM(total),0) AS v FROM orders WHERE substr(created_at,1,10)=? AND status!='cancelled'", [today]);
+  const lowStock = await c('SELECT COUNT(*) AS c FROM inventory_items WHERE active=1 AND qty_on_hand<=reorder_level');
+  const hkPending = await c("SELECT COUNT(*) AS c FROM housekeeping_tasks WHERE status!='done'");
+  const staffPresent = await c("SELECT COUNT(*) AS c FROM attendance WHERE date=? AND status IN ('present','half_day')", [today]);
+  const staffTotal = await c("SELECT COUNT(*) AS c FROM employees WHERE status='active'");
+  const pendingLeaves = await c("SELECT COUNT(*) AS c FROM leaves WHERE status='pending'");
+  const empties = await get('SELECT COALESCE(SUM(empties_on_hand),0) AS c, COALESCE(SUM(empties_on_hand*bottle_deposit),0) AS v FROM inventory_items WHERE returnable_bottle=1');
+  const revenue14 = await all(`SELECT date, SUM(CASE WHEN type='room' THEN total ELSE 0 END) AS room, SUM(CASE WHEN type IN ('restaurant','bar') THEN total ELSE 0 END) AS fnb FROM invoices WHERE date >= ${daysAgo(13)} GROUP BY date ORDER BY date`);
+  const occupancy14 = await all(`SELECT to_char(g.d,'YYYY-MM-DD') AS date,
+      (SELECT COUNT(*) FROM bookings b WHERE b.status IN ('checked_in','checked_out','confirmed') AND b.check_in<=to_char(g.d,'YYYY-MM-DD') AND b.check_out>to_char(g.d,'YYYY-MM-DD')) AS occupied
+      FROM generate_series((now() at time zone 'utc')::date - 13, (now() at time zone 'utc')::date, interval '1 day') AS g(d) ORDER BY g.d`);
+  const arrivalsList = await all("SELECT b.id, b.code, g.name AS guest_name, rt.name AS room_type_name, r.number AS room_number, b.status, b.nights FROM bookings b JOIN guests g ON g.id=b.guest_id JOIN room_types rt ON rt.id=b.room_type_id LEFT JOIN rooms r ON r.id=b.room_id WHERE b.check_in=? AND b.status IN ('pending','confirmed') ORDER BY b.id", [today]);
+  const departuresList = await all("SELECT b.id, b.code, g.name AS guest_name, r.number AS room_number, b.total, (SELECT COALESCE(SUM(amount),0) FROM payments WHERE booking_id=b.id) AS paid FROM bookings b JOIN guests g ON g.id=b.guest_id LEFT JOIN rooms r ON r.id=b.room_id WHERE b.check_out=? AND b.status='checked_in'", [today]);
+  const recentActivity = await all('SELECT * FROM audit_log ORDER BY id DESC LIMIT 12');
   res.json({
     rooms: { total: totalRooms, occupied, by_status: rooms, occupancy: totalRooms ? Math.round((occupied / totalRooms) * 100) : 0 },
     arrivals, departures, pending_web_bookings: pendingWeb, revenue_today: revToday, revenue_month: revMonth,
@@ -40,27 +43,27 @@ r.get('/dashboard', requireModule('dashboard'), (req, res) => {
 });
 
 // ---------- Settings ----------
-r.get('/settings', requireModule('settings'), (req, res) => res.json(getSettings()));
-r.put('/settings', requireRole('admin', 'manager'), (req, res) => {
-  for (const [k, v] of Object.entries(req.body || {})) setSetting(k, v);
-  audit(req, 'update', 'settings', null, Object.keys(req.body || {}));
-  res.json(getSettings());
+r.get('/settings', requireModule('settings'), async (req, res) => res.json(await getSettings()));
+r.put('/settings', requireRole('admin', 'manager'), async (req, res) => {
+  for (const [k, v] of Object.entries(req.body || {})) await setSetting(k, v);
+  await audit(req, 'update', 'settings', null, Object.keys(req.body || {}));
+  res.json(await getSettings());
 });
 
 // ---------- Users ----------
-r.get('/users', requireRole('admin', 'manager'), (req, res) => {
-  res.json(all('SELECT u.id, u.name, u.email, u.role, u.active, u.employee_id, u.created_at, e.name AS employee_name FROM users u LEFT JOIN employees e ON e.id=u.employee_id ORDER BY u.id'));
+r.get('/users', requireRole('admin', 'manager'), async (req, res) => {
+  res.json(await all('SELECT u.id, u.name, u.email, u.role, u.active, u.employee_id, u.created_at, e.name AS employee_name FROM users u LEFT JOIN employees e ON e.id=u.employee_id ORDER BY u.id'));
 });
-r.post('/users', requireRole('admin'), (req, res) => {
+r.post('/users', requireRole('admin'), async (req, res) => {
   const { name, email, password, role = 'frontdesk', employee_id = null } = req.body;
   if (!name || !email || !password) return res.status(400).json({ error: 'name, email and password are required' });
   if (!ROLES.includes(role)) return res.status(400).json({ error: 'Invalid role' });
-  if (get('SELECT id FROM users WHERE email=?', [email.toLowerCase()])) return res.status(400).json({ error: 'Email already in use' });
-  const id = insert('users', { name, email: email.toLowerCase(), password_hash: bcrypt.hashSync(password, 10), role, employee_id: employee_id || null });
-  audit(req, 'create', 'users', id, { email, role });
-  res.status(201).json(get('SELECT id, name, email, role, active, employee_id FROM users WHERE id=?', [id]));
+  if (await get('SELECT id FROM users WHERE email=?', [email.toLowerCase()])) return res.status(400).json({ error: 'Email already in use' });
+  const id = await insert('users', { name, email: email.toLowerCase(), password_hash: bcrypt.hashSync(password, 10), role, employee_id: employee_id || null });
+  await audit(req, 'create', 'users', id, { email, role });
+  res.status(201).json(await get('SELECT id, name, email, role, active, employee_id FROM users WHERE id=?', [id]));
 });
-r.put('/users/:id', requireRole('admin'), (req, res) => {
+r.put('/users/:id', requireRole('admin'), async (req, res) => {
   const { name, email, password, role, active, employee_id } = req.body;
   const patch = {};
   if (name) patch.name = name;
@@ -70,19 +73,19 @@ r.put('/users/:id', requireRole('admin'), (req, res) => {
   if (employee_id !== undefined) patch.employee_id = employee_id || null;
   if (password) patch.password_hash = bcrypt.hashSync(password, 10);
   if (Number(req.params.id) === req.user.id && patch.active === 0) return res.status(400).json({ error: 'You cannot disable yourself' });
-  update('users', req.params.id, patch);
-  audit(req, 'update', 'users', req.params.id, Object.keys(patch));
-  res.json(get('SELECT id, name, email, role, active, employee_id FROM users WHERE id=?', [req.params.id]));
+  await update('users', req.params.id, patch);
+  await audit(req, 'update', 'users', req.params.id, Object.keys(patch));
+  res.json(await get('SELECT id, name, email, role, active, employee_id FROM users WHERE id=?', [req.params.id]));
 });
-r.delete('/users/:id', requireRole('admin'), (req, res) => {
+r.delete('/users/:id', requireRole('admin'), async (req, res) => {
   if (Number(req.params.id) === req.user.id) return res.status(400).json({ error: 'You cannot delete yourself' });
-  remove('users', req.params.id);
+  await remove('users', req.params.id);
   res.json({ ok: true });
 });
 r.get('/roles', requireModule('dashboard'), (req, res) => res.json(ROLES));
 
-r.get('/audit', requireRole('admin', 'manager'), (req, res) => {
-  res.json(all('SELECT * FROM audit_log ORDER BY id DESC LIMIT 300'));
+r.get('/audit', requireRole('admin', 'manager'), async (req, res) => {
+  res.json(await all('SELECT * FROM audit_log ORDER BY id DESC LIMIT 300'));
 });
 
 export default r;

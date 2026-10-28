@@ -37,19 +37,16 @@ export function signToken(user) {
   return jwt.sign({ id: user.id, role: user.role, name: user.name }, JWT_SECRET, { expiresIn: '12h' });
 }
 
-export function requireAuth(req, res, next) {
+export async function requireAuth(req, res, next) {
   const h = req.headers.authorization || '';
   const token = h.startsWith('Bearer ') ? h.slice(7) : null;
   if (!token) return res.status(401).json({ error: 'Authentication required' });
-  try {
-    const payload = jwt.verify(token, JWT_SECRET);
-    const user = get('SELECT id, name, email, role, active, employee_id FROM users WHERE id=?', [payload.id]);
-    if (!user || !user.active) return res.status(401).json({ error: 'Account disabled' });
-    req.user = user;
-    next();
-  } catch {
-    return res.status(401).json({ error: 'Invalid or expired session' });
-  }
+  let payload;
+  try { payload = jwt.verify(token, JWT_SECRET); } catch { return res.status(401).json({ error: 'Invalid or expired session' }); }
+  const user = await get('SELECT id, name, email, role, active, employee_id FROM users WHERE id=?', [payload.id]);
+  if (!user || !user.active) return res.status(401).json({ error: 'Account disabled' });
+  req.user = user;
+  next();
 }
 
 export function requireModule(moduleName) {

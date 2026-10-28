@@ -1,14 +1,24 @@
 {
   "name": "janapriya-resort",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
+  "type": "module",
   "description": "Janapriya Resort - Complete Resort, Restaurant & Bar Management System",
+  "engines": { "node": ">=22" },
   "scripts": {
-    "postinstall": "npm --prefix server install && npm --prefix client install",
-    "dev": "concurrently -n server,client -c blue,green \"npm --prefix server run dev\" \"npm --prefix client run dev\"",
+    "postinstall": "npm --prefix client install",
+    "dev": "concurrently -n server,client -c blue,green \"npm run dev:server\" \"npm --prefix client run dev\"",
+    "dev:server": "node --env-file=.env --watch server/src/index.js",
     "build": "npm --prefix client run build",
-    "start": "npm --prefix server start",
-    "seed": "npm --prefix server run seed"
+    "start": "node --env-file=.env server/src/index.js",
+    "seed": "node --env-file=.env server/src/seed.js --reset"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.2",
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "pg": "^8.16.3"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"

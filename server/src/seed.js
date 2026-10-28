@@ -1,5 +1,5 @@
 import bcrypt from 'bcryptjs';
-import { db, all, get, run, insert, setSetting, transaction, SCHEMA } from './db.js';
+import { pool, all, get, run, insert, setSetting, transaction, ensureSchema } from './db.js';
 
 const RESET = process.argv.includes('--reset');
 
@@ -9,18 +9,17 @@ function d(offsetDays) {
   return dt.toISOString().slice(0, 10);
 }
 
-export function seedIfEmpty() {
+export async function seedIfEmpty() {
   if (RESET) {
-    const tables = all("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").map((r) => r.name);
-    db.exec('PRAGMA foreign_keys = OFF');
-    for (const t of tables) db.exec(`DROP TABLE IF EXISTS ${t}`);
-    db.exec('PRAGMA foreign_keys = ON');
-    db.exec(SCHEMA);
+    await pool.query('DROP SCHEMA public CASCADE; CREATE SCHEMA public;');
+    await pool.query((await import('./db.js')).SCHEMA);
+  } else {
+    await ensureSchema();
   }
-  const has = get('SELECT COUNT(*) AS c FROM users').c;
+  const has = (await get('SELECT COUNT(*) AS c FROM users')).c;
   if (has > 0) return false;
 
-  transaction(() => {
+  await transaction(async () => {
     // ---------- settings ----------
     const settings = {
       resort_name: 'Janapriya Resort',
@@ -43,16 +42,16 @@ export function seedIfEmpty() {
       website_hero_title: 'Escape to Serenity',
       website_hero_subtitle: 'Luxury lakeside rooms, a fine-dining restaurant and a sunset bar - all in one unforgettable place.',
     };
-    for (const [k, v] of Object.entries(settings)) setSetting(k, v);
+    for (const [k, v] of Object.entries(settings)) await setSetting(k, v);
 
     // ---------- departments & employees ----------
     const depts = ['Management', 'Front Office', 'Housekeeping', 'Restaurant', 'Bar', 'Kitchen', 'Maintenance', 'Accounts', 'Security'];
     const deptIds = {};
-    for (const name of depts) deptIds[name] = insert('departments', { name });
+    for (const name of depts) deptIds[name] = await insert('departments', { name });
 
-    insert('shifts', { name: 'Morning', start_time: '06:00', end_time: '14:00' });
-    insert('shifts', { name: 'Evening', start_time: '14:00', end_time: '22:00' });
-    insert('shifts', { name: 'Night', start_time: '22:00', end_time: '06:00' });
+    await insert('shifts', { name: 'Morning', start_time: '06:00', end_time: '14:00' });
+    await insert('shifts', { name: 'Evening', start_time: '14:00', end_time: '22:00' });
+    await insert('shifts', { name: 'Night', start_time: '22:00', end_time: '06:00' });
 
     const employees = [
       ['EMP001', 'Nimal Perera', 'Management', 'General Manager', 185000, 25000, 1],
@@ -72,8 +71,9 @@ export function seedIfEmpty() {
       ['EMP015', 'Sunil Weerasinghe', 'Security', 'Security Officer', 40000, 5000, 3],
     ];
     const empIds = {};
-    employees.forEach(([code, name, dept, desig, basic, allow, shift], i) => {
-      empIds[code] = insert('employees', {
+    for (let i = 0; i < employees.length; i++) {
+      const [code, name, dept, desig, basic, allow, shift] = employees[i];
+      empIds[code] = await insert('employees', {
         emp_code: code, name, email: `${code.toLowerCase()}@janapriyaresort.lk`,
         phone: `+94 7${(10000000 + i * 1234567).toString().slice(0, 8)}`,
         nic: `${1985 + i}${String(100000000 + i * 3457).slice(-6)}V`,
@@ -81,7 +81,7 @@ export function seedIfEmpty() {
         salary_basic: basic, allowances: allow, status: 'active', shift_id: shift,
         address: 'Sri Lanka', emergency_contact: '+94 71 000 0000',
       });
-    });
+    }
 
     // ---------- users ----------
     const pw = (p) => bcrypt.hashSync(p, 10);
@@ -96,7 +96,7 @@ export function seedIfEmpty() {
       ['Kumari Jayasinghe', 'hr@janapriya.lk', 'hr123', 'hr', 'EMP002'],
     ];
     for (const [name, email, p, role, emp] of users) {
-      insert('users', { name, email, password_hash: pw(p), role, employee_id: emp ? empIds[emp] : null });
+      await insert('users', { name, email, password_hash: pw(p), role, employee_id: emp ? empIds[emp] : null });
     }
 
     // ---------- room types & rooms ----------
@@ -108,7 +108,7 @@ export function seedIfEmpty() {
     ];
     const typeIds = [];
     for (const [name, description, rate, a, c, size, amen, img] of types) {
-      typeIds.push(insert('room_types', { name, description, base_rate: rate, max_adults: a, max_children: c, size_sqm: size, amenities: amen, image_url: img }));
+      typeIds.push(await insert('room_types', { name, description, base_rate: rate, max_adults: a, max_children: c, size_sqm: size, amenities: amen, image_url: img }));
     }
     const roomIds = [];
     const roomPlan = [
@@ -117,7 +117,7 @@ export function seedIfEmpty() {
       [3, typeIds[2], ['301', '302', '303']],
       [0, typeIds[3], ['V1', 'V2', 'V3']],
     ];
-    for (const [floor, tid, nums] of roomPlan) for (const n of nums) roomIds.push(insert('rooms', { number: n, room_type_id: tid, floor, status: 'available' }));
+    for (const [floor, tid, nums] of roomPlan) for (const n of nums) roomIds.push(await insert('rooms', { number: n, room_type_id: tid, floor, status: 'available' }));
 
     // ---------- guests & bookings ----------
     const guests = [
@@ -128,67 +128,64 @@ export function seedIfEmpty() {
       ['Dinesh Kodikara', 'dinesh@example.com', '+94 71 345 6789', '881234567V', 'Sri Lankan'],
       ['Emily Chen', 'emily.c@example.com', '+61 412 345 678', 'AU7654321', 'Australian'],
     ];
-    const guestIds = guests.map(([name, email, phone, nic, nat]) => insert('guests', { name, email, phone, nic_passport: nic, nationality: nat }));
+    const guestIds = [];
+    for (const [name, email, phone, nic, nat] of guests) guestIds.push(await insert('guests', { name, email, phone, nic_passport: nic, nationality: nat }));
 
     const TAX = 18;
-    const mkBooking = (gi, roomIdx, typeIdx, ci, co, status, source, adults = 2, children = 0, createdOffset = -10) => {
+    let bookingCount = 0;
+    const mkBooking = async (gi, roomIdx, typeIdx, ci, co, status, source, adults = 2, children = 0, createdOffset = -10) => {
       const nights = Math.max(1, Math.round((new Date(co) - new Date(ci)) / 86400000));
       const rate = types[typeIdx][2];
       const subtotal = rate * nights;
       const tax = subtotal * TAX / 100;
       const total = subtotal + tax;
-      const code = `JR${String(get('SELECT COUNT(*) AS c FROM bookings').c + 1).padStart(5, '0')}`;
-      const id = insert('bookings', {
+      const code = `JR${String(++bookingCount).padStart(5, '0')}`;
+      const id = await insert('bookings', {
         code, guest_id: guestIds[gi], room_id: roomIds[roomIdx], room_type_id: typeIds[typeIdx], check_in: ci, check_out: co,
         adults, children, status, source, rate, nights, subtotal, tax, discount: 0, total,
         checked_in_at: ['checked_in', 'checked_out'].includes(status) ? `${ci} 14:30` : null,
         checked_out_at: status === 'checked_out' ? `${co} 10:45` : null,
         created_at: `${d(createdOffset)} 10:00:00`,
       });
-      insert('booking_charges', { booking_id: id, description: `Room charge x ${nights} night(s)`, amount: subtotal, type: 'room' });
-      if (status === 'checked_in') run('UPDATE rooms SET status=? WHERE id=?', ['occupied', roomIds[roomIdx]]);
+      await insert('booking_charges', { booking_id: id, description: `Room charge x ${nights} night(s)`, amount: subtotal, type: 'room' });
+      if (status === 'checked_in') await run('UPDATE rooms SET status=? WHERE id=?', ['occupied', roomIds[roomIdx]]);
       return { id, total, code };
     };
 
-    // past (checked out)
     for (let i = 0; i < 14; i++) {
       const gi = i % guests.length; const typeIdx = i % 4; const roomIdx = [0, 6, 12, 15][typeIdx] + (i % 3);
       const ci = d(-(40 - i * 2)); const co = d(-(40 - i * 2) + 2 + (i % 3));
-      const b = mkBooking(gi, roomIdx, typeIdx, ci, co, 'checked_out', ['website', 'walkin', 'phone', 'agent'][i % 4], 2, i % 2, -(45 - i * 2));
-      insert('payments', { booking_id: b.id, amount: b.total, method: ['cash', 'card', 'bank', 'online'][i % 4], received_by: 1, created_at: `${co} 10:50:00` });
-      insert('invoices', { number: `INV-R-${String(i + 1).padStart(5, '0')}`, type: 'room', ref_id: b.id, guest_name: guests[gi][0], subtotal: b.total / 1.18, tax: b.total - b.total / 1.18, total: b.total, paid: b.total, status: 'paid', date: co, created_at: `${co} 10:50:00` });
+      const b = await mkBooking(gi, roomIdx, typeIdx, ci, co, 'checked_out', ['website', 'walkin', 'phone', 'agent'][i % 4], 2, i % 2, -(45 - i * 2));
+      await insert('payments', { booking_id: b.id, amount: b.total, method: ['cash', 'card', 'bank', 'online'][i % 4], received_by: 1, created_at: `${co} 10:50:00` });
+      await insert('invoices', { number: `INV-R-${String(i + 1).padStart(5, '0')}`, type: 'room', ref_id: b.id, guest_name: guests[gi][0], subtotal: b.total / 1.18, tax: b.total - b.total / 1.18, total: b.total, paid: b.total, status: 'paid', date: co, created_at: `${co} 10:50:00` });
     }
-    // in-house
-    const inhouse1 = mkBooking(1, 7, 1, d(-2), d(2), 'checked_in', 'website', 2, 0, -12);
-    insert('payments', { booking_id: inhouse1.id, amount: 20000, method: 'card', note: 'Advance', received_by: 1 });
-    const inhouse2 = mkBooking(3, 13, 2, d(-1), d(3), 'checked_in', 'phone', 2, 2, -8);
-    const inhouse3 = mkBooking(5, 16, 3, d(0), d(4), 'checked_in', 'website', 2, 0, -20);
-    insert('payments', { booking_id: inhouse3.id, amount: inhouse3.total, method: 'online', note: 'Full prepayment', received_by: 1 });
-    // upcoming
-    mkBooking(0, 1, 0, d(1), d(3), 'confirmed', 'walkin', 2, 1, -3);
-    mkBooking(2, 8, 1, d(2), d(6), 'confirmed', 'website', 2, 0, -5);
-    mkBooking(4, 14, 2, d(5), d(8), 'pending', 'website', 3, 2, -1);
-    mkBooking(1, 17, 3, d(10), d(14), 'confirmed', 'agent', 2, 0, -2);
-    // housekeeping states
-    run("UPDATE rooms SET status='dirty' WHERE id=?", [roomIds[2]]);
-    run("UPDATE rooms SET status='maintenance', notes='AC unit repair' WHERE id=?", [roomIds[11]]);
-    insert('housekeeping_tasks', { room_id: roomIds[2], type: 'cleaning', priority: 'high', status: 'pending', assigned_to: empIds.EMP005, notes: 'Guest checked out this morning' });
-    insert('housekeeping_tasks', { room_id: roomIds[11], type: 'maintenance', priority: 'high', status: 'in_progress', assigned_to: empIds.EMP013, notes: 'AC not cooling - compressor check' });
-    insert('housekeeping_tasks', { room_id: roomIds[7], type: 'cleaning', priority: 'normal', status: 'pending', assigned_to: empIds.EMP005, notes: 'Daily service - in-house guest' });
+    const inhouse1 = await mkBooking(1, 7, 1, d(-2), d(2), 'checked_in', 'website', 2, 0, -12);
+    await insert('payments', { booking_id: inhouse1.id, amount: 20000, method: 'card', note: 'Advance', received_by: 1 });
+    await mkBooking(3, 13, 2, d(-1), d(3), 'checked_in', 'phone', 2, 2, -8);
+    const inhouse3 = await mkBooking(5, 16, 3, d(0), d(4), 'checked_in', 'website', 2, 0, -20);
+    await insert('payments', { booking_id: inhouse3.id, amount: inhouse3.total, method: 'online', note: 'Full prepayment', received_by: 1 });
+    await mkBooking(0, 1, 0, d(1), d(3), 'confirmed', 'walkin', 2, 1, -3);
+    await mkBooking(2, 8, 1, d(2), d(6), 'confirmed', 'website', 2, 0, -5);
+    await mkBooking(4, 14, 2, d(5), d(8), 'pending', 'website', 3, 2, -1);
+    await mkBooking(1, 17, 3, d(10), d(14), 'confirmed', 'agent', 2, 0, -2);
+    await run("UPDATE rooms SET status='dirty' WHERE id=?", [roomIds[2]]);
+    await run("UPDATE rooms SET status='maintenance', notes='AC unit repair' WHERE id=?", [roomIds[11]]);
+    await insert('housekeeping_tasks', { room_id: roomIds[2], type: 'cleaning', priority: 'high', status: 'pending', assigned_to: empIds.EMP005, notes: 'Guest checked out this morning' });
+    await insert('housekeeping_tasks', { room_id: roomIds[11], type: 'maintenance', priority: 'high', status: 'in_progress', assigned_to: empIds.EMP013, notes: 'AC not cooling - compressor check' });
+    await insert('housekeeping_tasks', { room_id: roomIds[7], type: 'cleaning', priority: 'normal', status: 'pending', assigned_to: empIds.EMP005, notes: 'Daily service - in-house guest' });
 
     // ---------- suppliers ----------
     const sup = {
-      lion: insert('suppliers', { name: 'Lion Brewery (Ceylon) PLC', contact_person: 'Sales Desk', phone: '+94 11 246 5000', category: 'beer', address: 'Biyagama' }),
-      dcsl: insert('suppliers', { name: 'Distilleries Company of Sri Lanka', contact_person: 'Area Rep', phone: '+94 11 230 0000', category: 'liquor', address: 'Colombo' }),
-      rockland: insert('suppliers', { name: 'Rockland Distilleries', contact_person: 'Sales', phone: '+94 11 272 0000', category: 'liquor' }),
-      coke: insert('suppliers', { name: 'Coca-Cola Beverages Sri Lanka', contact_person: 'Distributor', phone: '+94 11 282 0000', category: 'soft_drink' }),
-      fresh: insert('suppliers', { name: 'Lakeside Fresh Produce', contact_person: 'Sunil', phone: '+94 77 999 1234', category: 'food' }),
-      general: insert('suppliers', { name: 'Hotel Supplies Lanka', contact_person: 'Ravi', phone: '+94 11 555 1234', category: 'general' }),
+      lion: await insert('suppliers', { name: 'Lion Brewery (Ceylon) PLC', contact_person: 'Sales Desk', phone: '+94 11 246 5000', category: 'beer', address: 'Biyagama' }),
+      dcsl: await insert('suppliers', { name: 'Distilleries Company of Sri Lanka', contact_person: 'Area Rep', phone: '+94 11 230 0000', category: 'liquor', address: 'Colombo' }),
+      rockland: await insert('suppliers', { name: 'Rockland Distilleries', contact_person: 'Sales', phone: '+94 11 272 0000', category: 'liquor' }),
+      coke: await insert('suppliers', { name: 'Coca-Cola Beverages Sri Lanka', contact_person: 'Distributor', phone: '+94 11 282 0000', category: 'soft_drink' }),
+      fresh: await insert('suppliers', { name: 'Lakeside Fresh Produce', contact_person: 'Sunil', phone: '+94 77 999 1234', category: 'food' }),
+      general: await insert('suppliers', { name: 'Hotel Supplies Lanka', contact_person: 'Ravi', phone: '+94 11 555 1234', category: 'general' }),
     };
 
     // ---------- inventory ----------
     const inv = [
-      // name, category, unit, unit_size(ml), qty, reorder, cost, sell, supplier, returnable, deposit, empties
       ['Lion Lager 625ml', 'beer', 'bottle', 625, 96, 48, 420, 750, 'lion', 1, 100, 34],
       ['Lion Lager 330ml', 'beer', 'bottle', 330, 120, 48, 260, 500, 'lion', 1, 60, 51],
       ['Lion Strong 625ml', 'beer', 'bottle', 625, 60, 36, 450, 800, 'lion', 1, 100, 22],
@@ -219,16 +216,16 @@ export function seedIfEmpty() {
       ['Soap Bar', 'housekeeping', 'pcs', 0, 350, 100, 35, 0, 'general', 0, 0, 0],
     ];
     const invIds = {};
-    inv.forEach(([name, category, unit, unit_size, qty, reorder, cost, sell, s, ret, dep, empties], i) => {
-      invIds[name] = insert('inventory_items', {
+    for (let i = 0; i < inv.length; i++) {
+      const [name, category, unit, unit_size, qty, reorder, cost, sell, s, ret, dep, empties] = inv[i];
+      invIds[name] = await insert('inventory_items', {
         sku: `SKU${String(i + 1).padStart(4, '0')}`, name, category, unit, unit_size, qty_on_hand: qty, reorder_level: reorder,
         cost_price: cost, sell_price: sell, supplier_id: sup[s], returnable_bottle: ret, bottle_deposit: dep, empties_on_hand: empties,
         location: category === 'housekeeping' ? 'housekeeping_store' : ['beer', 'liquor', 'wine', 'soft_drink'].includes(category) ? 'bar' : 'kitchen',
       });
-      insert('stock_movements', { inventory_item_id: invIds[name], qty, type: 'opening', note: 'Opening stock', user_id: 1, created_at: `${d(-30)} 09:00:00` });
-    });
+      await insert('stock_movements', { inventory_item_id: invIds[name], qty, type: 'opening', note: 'Opening stock', user_id: 1, created_at: `${d(-30)} 09:00:00` });
+    }
 
-    // purchases history
     const purchaseDefs = [
       ['lion', -25, [['Lion Lager 625ml', 96, 420], ['Lion Lager 330ml', 120, 260], ['Lion Strong 625ml', 60, 450]]],
       ['dcsl', -20, [['Old Arrack 750ml', 24, 3200], ['Extra Special Arrack 750ml', 18, 2600]]],
@@ -236,16 +233,16 @@ export function seedIfEmpty() {
       ['fresh', -3, [['Chicken (whole)', 20, 1250], ['Prawns (large)', 5, 3200], ['Mixed Vegetables', 25, 380]]],
       ['rockland', -12, [['Johnnie Walker Black 750ml', 6, 14500], ['Smirnoff Vodka 750ml', 8, 6500], ['House Red Wine 750ml', 12, 3400]]],
     ];
-    purchaseDefs.forEach(([s, off, items], i) => {
+    for (let i = 0; i < purchaseDefs.length; i++) {
+      const [s, off, items] = purchaseDefs[i];
       const total = items.reduce((a, [, q, c]) => a + q * c, 0);
-      const pid = insert('purchases', { code: `PO${String(i + 1).padStart(5, '0')}`, supplier_id: sup[s], invoice_no: `SUP-${1000 + i}`, date: d(off), total, paid: i < 3 ? total : 0, status: i < 3 ? 'paid' : 'received', created_by: 1, created_at: `${d(off)} 11:00:00` });
-      for (const [n, q, c] of items) insert('purchase_items', { purchase_id: pid, inventory_item_id: invIds[n], qty: q, unit_cost: c });
-    });
+      const pid = await insert('purchases', { code: `PO${String(i + 1).padStart(5, '0')}`, supplier_id: sup[s], invoice_no: `SUP-${1000 + i}`, date: d(off), total, paid: i < 3 ? total : 0, status: i < 3 ? 'paid' : 'received', created_by: 1, created_at: `${d(off)} 11:00:00` });
+      for (const [n, q, c] of items) await insert('purchase_items', { purchase_id: pid, inventory_item_id: invIds[n], qty: q, unit_cost: c });
+    }
 
-    // empty bottle history
-    insert('empty_bottle_log', { inventory_item_id: invIds['Lion Lager 625ml'], qty: 48, action: 'returned', supplier_id: sup.lion, amount: 4800, note: 'Returned with weekly delivery', user_id: 1, created_at: `${d(-7)} 10:00:00` });
-    insert('empty_bottle_log', { inventory_item_id: invIds['Lion Lager 625ml'], qty: 2, action: 'broken', amount: 200, note: 'Dropped in bar store', user_id: 1, created_at: `${d(-5)} 22:10:00` });
-    insert('empty_bottle_log', { inventory_item_id: invIds['Coca-Cola 300ml'], qty: 72, action: 'returned', supplier_id: sup.coke, amount: 2880, note: 'Crates exchanged', user_id: 1, created_at: `${d(-4)} 09:30:00` });
+    await insert('empty_bottle_log', { inventory_item_id: invIds['Lion Lager 625ml'], qty: 48, action: 'returned', supplier_id: sup.lion, amount: 4800, note: 'Returned with weekly delivery', user_id: 1, created_at: `${d(-7)} 10:00:00` });
+    await insert('empty_bottle_log', { inventory_item_id: invIds['Lion Lager 625ml'], qty: 2, action: 'broken', amount: 200, note: 'Dropped in bar store', user_id: 1, created_at: `${d(-5)} 22:10:00` });
+    await insert('empty_bottle_log', { inventory_item_id: invIds['Coca-Cola 300ml'], qty: 72, action: 'returned', supplier_id: sup.coke, amount: 2880, note: 'Crates exchanged', user_id: 1, created_at: `${d(-4)} 09:30:00` });
 
     // ---------- tables ----------
     const tableDefs = [
@@ -258,15 +255,16 @@ export function seedIfEmpty() {
       ['O1', 'outdoor', 4, 60, 60, 'square'], ['O2', 'outdoor', 4, 200, 60, 'square'], ['O3', 'outdoor', 6, 340, 60, 'rect'], ['O4', 'outdoor', 2, 60, 200, 'round'],
     ];
     const tableIds = {};
-    for (const [name, area, cap, x, y, shape] of tableDefs) tableIds[name] = insert('tables', { name, area, capacity: cap, x, y, shape });
-    insert('table_reservations', { table_id: tableIds.T7, guest_name: 'Perera Family', phone: '+94 77 111 2222', date: d(0), time: '19:30', party_size: 8, status: 'booked', notes: 'Birthday - need cake' });
-    insert('table_reservations', { table_id: tableIds.O3, guest_name: 'Sarah Thompson', phone: '+44 7700 900123', date: d(1), time: '20:00', party_size: 4, status: 'booked' });
+    for (const [name, area, cap, x, y, shape] of tableDefs) tableIds[name] = await insert('tables', { name, area, capacity: cap, x, y, shape });
+    await insert('table_reservations', { table_id: tableIds.T7, guest_name: 'Perera Family', phone: '+94 77 111 2222', date: d(0), time: '19:30', party_size: 8, status: 'booked', notes: 'Birthday - need cake' });
+    await insert('table_reservations', { table_id: tableIds.O3, guest_name: 'Sarah Thompson', phone: '+44 7700 900123', date: d(1), time: '20:00', party_size: 4, status: 'booked' });
 
     // ---------- menu ----------
     const cats = {};
-    [['Starters', 'food', 1], ['Sri Lankan Mains', 'food', 2], ['Western Mains', 'food', 3], ['Seafood', 'food', 4], ['Desserts', 'food', 5],
-      ['Beer', 'beverage', 6], ['Spirits', 'liquor', 7], ['Cocktails', 'liquor', 8], ['Wine', 'beverage', 9], ['Soft Drinks', 'beverage', 10], ['Hot Beverages', 'beverage', 11]]
-      .forEach(([n, t, s]) => (cats[n] = insert('menu_categories', { name: n, type: t, sort: s })));
+    for (const [n, t, s] of [['Starters', 'food', 1], ['Sri Lankan Mains', 'food', 2], ['Western Mains', 'food', 3], ['Seafood', 'food', 4], ['Desserts', 'food', 5],
+      ['Beer', 'beverage', 6], ['Spirits', 'liquor', 7], ['Cocktails', 'liquor', 8], ['Wine', 'beverage', 9], ['Soft Drinks', 'beverage', 10], ['Hot Beverages', 'beverage', 11]]) {
+      cats[n] = await insert('menu_categories', { name: n, type: t, sort: s });
+    }
     const menu = [
       ['Starters', 'Devilled Cuttlefish', 'Crispy cuttlefish tossed in spicy devilled sauce', 1650, 600, null, 1, 'spicy'],
       ['Starters', 'Chicken Spring Rolls', 'Golden fried, served with sweet chilli', 950, 320, null, 1, ''],
@@ -283,7 +281,7 @@ export function seedIfEmpty() {
       ['Desserts', 'Watalappam', 'Jaggery & coconut custard', 650, 180, null, 1, 'popular'],
       ['Desserts', 'Curd & Treacle', 'Buffalo curd with kithul treacle', 550, 150, null, 1, ''],
       ['Desserts', 'Chocolate Brownie', 'Warm, with vanilla ice cream', 850, 260, null, 1, ''],
-      ['Beer', 'Lion Lager 625ml', 'Sri Lanka\'s favourite lager', 750, 420, 'Lion Lager 625ml', 1, 'popular'],
+      ['Beer', 'Lion Lager 625ml', "Sri Lanka's favourite lager", 750, 420, 'Lion Lager 625ml', 1, 'popular'],
       ['Beer', 'Lion Lager 330ml', '', 500, 260, 'Lion Lager 330ml', 1, ''],
       ['Beer', 'Lion Strong 625ml', '8.8% ABV', 800, 450, 'Lion Strong 625ml', 1, ''],
       ['Beer', 'Carlsberg Can 500ml', '', 700, 390, 'Carlsberg 500ml Can', 1, ''],
@@ -312,26 +310,27 @@ export function seedIfEmpty() {
     ];
     const menuIds = {};
     for (const [cat, name, desc, price, cost, invName, portion, tags] of menu) {
-      menuIds[name] = insert('menu_items', { category_id: cats[cat], name, description: desc, price, cost, inventory_item_id: invName ? invIds[invName] : null, portion_qty: portion, tags });
+      menuIds[name] = await insert('menu_items', { category_id: cats[cat], name, description: desc, price, cost, inventory_item_id: invName ? invIds[invName] : null, portion_qty: portion, tags });
     }
 
     // ---------- orders history ----------
     const SC = 10;
-    const mkOrder = (tableName, items, status, offsetDays, hour, bookingId = null) => {
-      const code = `ORD${String(get('SELECT COUNT(*) AS c FROM orders').c + 1).padStart(5, '0')}`;
+    let orderCount = 0; let fnbInvoiceCount = 0;
+    const mkOrder = async (tableName, items, status, offsetDays, hour, bookingId = null) => {
+      const code = `ORD${String(++orderCount).padStart(5, '0')}`;
       const subtotal = items.reduce((a, [n, q]) => a + menu.find((m) => m[1] === n)[3] * q, 0);
       const service_charge = subtotal * SC / 100; const tax = (subtotal + service_charge) * TAX / 100; const total = subtotal + service_charge + tax;
       const ts = `${d(offsetDays)} ${String(hour).padStart(2, '0')}:${String(10 + (subtotal % 50)).padStart(2, '0')}:00`;
-      const id = insert('orders', { code, table_id: tableIds[tableName], booking_id: bookingId, type: bookingId ? 'room_service' : 'dine_in', status, covers: 2 + (subtotal % 3), subtotal, tax, service_charge, discount: 0, total, waiter_id: empIds.EMP007, created_at: ts, closed_at: status === 'paid' ? ts : null });
-      for (const [n, q] of items) insert('order_items', { order_id: id, menu_item_id: menuIds[n], name: n, qty: q, price: menu.find((m) => m[1] === n)[3], status: status === 'open' ? 'preparing' : 'served', created_at: ts });
+      const id = await insert('orders', { code, table_id: tableIds[tableName], booking_id: bookingId, type: bookingId ? 'room_service' : 'dine_in', status, covers: 2 + (subtotal % 3), subtotal, tax, service_charge, discount: 0, total, waiter_id: empIds.EMP007, created_at: ts, closed_at: status === 'paid' ? ts : null });
+      for (const [n, q] of items) await insert('order_items', { order_id: id, menu_item_id: menuIds[n], name: n, qty: q, price: menu.find((m) => m[1] === n)[3], status: status === 'open' ? 'preparing' : 'served', created_at: ts });
       if (status === 'paid') {
-        insert('payments', { order_id: id, amount: total, method: ['cash', 'card'][subtotal % 2], received_by: 1, created_at: ts });
-        insert('invoices', { number: `INV-F-${String(get('SELECT COUNT(*) AS c FROM invoices WHERE type IN (\'restaurant\',\'bar\')').c + 1).padStart(5, '0')}`, type: tableName.startsWith('B') ? 'bar' : 'restaurant', ref_id: id, guest_name: 'Walk-in', subtotal, tax, service_charge, total, paid: total, status: 'paid', date: d(offsetDays), created_at: ts });
+        await insert('payments', { order_id: id, amount: total, method: ['cash', 'card'][subtotal % 2], received_by: 1, created_at: ts });
+        await insert('invoices', { number: `INV-F-${String(++fnbInvoiceCount).padStart(5, '0')}`, type: tableName.startsWith('B') ? 'bar' : 'restaurant', ref_id: id, guest_name: 'Walk-in', subtotal, tax, service_charge, total, paid: total, status: 'paid', date: d(offsetDays), created_at: ts });
       }
-      if (status === 'open') run("UPDATE tables SET status='occupied' WHERE id=?", [tableIds[tableName]]);
-      return id;
+      if (status === 'open') await run("UPDATE tables SET status='occupied' WHERE id=?", [tableIds[tableName]]);
+      return { id, total };
     };
-    const pool = [
+    const pool_ = [
       ['T3', [['Rice & Curry (Chicken)', 2], ['Lion Lager 625ml', 2], ['Watalappam', 2]]],
       ['B1', [['Old Arrack (shot 60ml)', 4], ['Soda 300ml', 2], ['Devilled Cuttlefish', 1]]],
       ['T6', [['Grilled Seer Fish', 2], ['House White (glass)', 2], ['Chocolate Brownie', 1]]],
@@ -344,22 +343,17 @@ export function seedIfEmpty() {
     for (let day = 30; day >= 1; day--) {
       const n = 2 + (day % 3);
       for (let k = 0; k < n; k++) {
-        const [t, items] = pool[(day + k) % pool.length];
-        mkOrder(t, items, 'paid', -day, 12 + ((day + k * 3) % 10));
+        const [t, items] = pool_[(day + k) % pool_.length];
+        await mkOrder(t, items, 'paid', -day, 12 + ((day + k * 3) % 10));
       }
     }
-    // today's open orders
-    mkOrder('T3', [['Rice & Curry (Chicken)', 2], ['Lion Lager 625ml', 2]], 'open', 0, 12);
-    mkOrder('B3', [['Mojito', 2], ['Devilled Cuttlefish', 1]], 'open', 0, 13);
-    mkOrder('T6', [['Grilled Seer Fish', 1], ['Garlic Butter Prawns', 1], ['House White (bottle)', 1]], 'open', 0, 13);
-    // room service charged to in-house guest
-    const rsId = mkOrder('T1', [['Club Sandwich & Fries', 2], ['Fresh Lime Juice', 2]], 'paid', -1, 20, inhouse1.id);
-    run("UPDATE orders SET type='room_service', table_id=NULL, status='billed' WHERE id=?", [rsId]);
-    run('DELETE FROM payments WHERE order_id=?', [rsId]);
-    run('DELETE FROM invoices WHERE ref_id=? AND type IN (\'restaurant\',\'bar\')', [rsId]);
-    const rsOrder = get('SELECT total FROM orders WHERE id=?', [rsId]);
-    insert('booking_charges', { booking_id: inhouse1.id, description: 'Room service - Club Sandwich x2, Lime Juice x2', amount: rsOrder.total, type: 'restaurant', ref_id: rsId });
-    run("UPDATE tables SET status='free' WHERE id=?", [tableIds.T1]);
+    await mkOrder('T3', [['Rice & Curry (Chicken)', 2], ['Lion Lager 625ml', 2]], 'open', 0, 12);
+    await mkOrder('B3', [['Mojito', 2], ['Devilled Cuttlefish', 1]], 'open', 0, 13);
+    await mkOrder('T6', [['Grilled Seer Fish', 1], ['Garlic Butter Prawns', 1], ['House White (bottle)', 1]], 'open', 0, 13);
+    // room service charged to in-house guest (billed to folio, not paid directly)
+    const rs = await mkOrder('T1', [['Club Sandwich & Fries', 2], ['Fresh Lime Juice', 2]], 'billed', -1, 20, inhouse1.id);
+    await run("UPDATE orders SET type='room_service', table_id=NULL WHERE id=?", [rs.id]);
+    await insert('booking_charges', { booking_id: inhouse1.id, description: 'Room service - Club Sandwich x2, Lime Juice x2', amount: rs.total, type: 'restaurant', ref_id: rs.id });
 
     // ---------- expenses ----------
     const exp = [
@@ -374,41 +368,43 @@ export function seedIfEmpty() {
       ['utilities', 'Internet - SLT Fibre', 12500, -18, 'SLT', 'bank'],
       ['general', 'Garden maintenance', 15000, -8, 'Green Hands', 'cash'],
     ];
-    for (const [category, description, amount, off, paid_to, method] of exp) insert('expenses', { category, description, amount, date: d(off), paid_to, method, created_by: 1 });
+    for (const [category, description, amount, off, paid_to, method] of exp) await insert('expenses', { category, description, amount, date: d(off), paid_to, method, created_by: 1 });
 
     // ---------- attendance (last 30 days) ----------
-    const empRows = all('SELECT id FROM employees');
+    const empRows = await all('SELECT id FROM employees');
     for (let off = 30; off >= 0; off--) {
       const date = d(-off);
       const dow = new Date(date).getDay();
       for (const e of empRows) {
         const rnd = (e.id * 31 + off * 17) % 20;
-        if (dow === 0 && rnd < 10) continue; // some off on Sundays
+        if (dow === 0 && rnd < 10) continue;
         let status = 'present';
         if (rnd === 0) status = 'absent'; else if (rnd === 1) status = 'leave'; else if (rnd === 2) status = 'half_day';
         const hours = status === 'present' ? 8 + (rnd > 15 ? 2 : 0) : status === 'half_day' ? 4 : 0;
-        if (off === 0 && rnd > 12) continue; // not yet marked today
-        insert('attendance', { employee_id: e.id, date, check_in: hours ? '08:0' + (rnd % 10) : null, check_out: hours ? (hours >= 8 ? `${8 + hours}:0${rnd % 10}` : '12:00') : null, status, hours, overtime_hours: hours > 8 ? hours - 8 : 0 });
+        if (off === 0 && rnd > 12) continue;
+        await insert('attendance', { employee_id: e.id, date, check_in: hours ? '08:0' + (rnd % 10) : null, check_out: hours ? (hours >= 8 ? `${8 + hours}:0${rnd % 10}` : '12:00') : null, status, hours, overtime_hours: hours > 8 ? hours - 8 : 0 });
       }
     }
-    insert('leaves', { employee_id: empIds.EMP007, type: 'annual', from_date: d(3), to_date: d(5), days: 3, reason: 'Family trip', status: 'pending' });
-    insert('leaves', { employee_id: empIds.EMP010, type: 'sick', from_date: d(-2), to_date: d(-1), days: 2, reason: 'Fever', status: 'approved' });
-    insert('leaves', { employee_id: empIds.EMP005, type: 'casual', from_date: d(7), to_date: d(7), days: 1, reason: 'Personal', status: 'pending' });
+    await insert('leaves', { employee_id: empIds.EMP007, type: 'annual', from_date: d(3), to_date: d(5), days: 3, reason: 'Family trip', status: 'pending' });
+    await insert('leaves', { employee_id: empIds.EMP010, type: 'sick', from_date: d(-2), to_date: d(-1), days: 2, reason: 'Fever', status: 'approved' });
+    await insert('leaves', { employee_id: empIds.EMP005, type: 'casual', from_date: d(7), to_date: d(7), days: 1, reason: 'Personal', status: 'pending' });
 
     // ---------- payroll (last month, paid) ----------
     const lastMonth = new Date(); lastMonth.setMonth(lastMonth.getMonth() - 1);
     const lm = lastMonth.toISOString().slice(0, 7);
-    for (const e of all('SELECT * FROM employees')) {
+    for (const e of await all('SELECT * FROM employees')) {
       const epfE = e.salary_basic * 0.08, epfR = e.salary_basic * 0.12, etf = e.salary_basic * 0.03;
       const gross = e.salary_basic + e.allowances;
-      insert('payroll', { employee_id: e.id, month: lm, basic: e.salary_basic, allowances: e.allowances, overtime: 0, bonus: 0, deductions: 0, epf_employee: epfE, epf_employer: epfR, etf, net: gross - epfE, status: 'paid', paid_at: `${lm}-28 16:00:00` });
+      await insert('payroll', { employee_id: e.id, month: lm, basic: e.salary_basic, allowances: e.allowances, overtime: 0, bonus: 0, deductions: 0, epf_employee: epfE, epf_employer: epfR, etf, net: gross - epfE, status: 'paid', paid_at: `${lm}-28 16:00:00` });
     }
   });
   return true;
 }
 
-// Run directly: `node src/seed.js --reset`
-if (process.argv[1] && process.argv[1].endsWith('seed.js')) {
-  const done = seedIfEmpty();
-  console.log(done ? 'Database seeded with demo data.' : 'Database already has data (use --reset to rebuild).');
+// Run directly: `node --env-file=.env src/seed.js --reset`
+if (process.argv[1] && process.argv[1].replace(/\\/g, '/').endsWith('/src/seed.js')) {
+  const t0 = Date.now();
+  const done = await seedIfEmpty();
+  console.log(done ? `Database seeded with demo data in ${Math.round((Date.now() - t0) / 1000)}s.` : 'Database already has data (use --reset to rebuild).');
+  await pool.end();
 }

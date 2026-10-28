@@ -2,14 +2,16 @@
 
 A complete, single-install management system for Janapriya Resort covering the **public booking website**, **front desk**, **restaurant & bar POS**, **inventory with empty-bottle tracking**, **HR & payroll**, and **finance**.
 
-- Backend: Node.js 24 + Express 5 + SQLite (built-in `node:sqlite`, no native build, no external DB)
+- Backend: Node.js 22+ + Express 5 + PostgreSQL (Neon serverless Postgres, free tier)
 - Frontend: React 18 + Vite + Tailwind CSS 4 + Framer Motion + Recharts
 - Auth: JWT with role-based access per module
 
 ## Quick start
 
 ```bash
-npm install          # installs root, server and client dependencies
+npm install          # installs root and client dependencies
+copy .env.example .env   # then paste your Neon DATABASE_URL and a JWT_SECRET into .env
+npm run seed         # creates the tables and loads demo data (first time only)
 npm run dev          # API on http://localhost:4000, website on http://localhost:5173
 ```
 
@@ -20,8 +22,7 @@ npm run build
 npm start            # http://localhost:4000
 ```
 
-The database is created and seeded with demo data on first run at `server/data/janapriya.db`.
-To reset to fresh demo data: `npm run seed`.
+Tables are created automatically on first request. `npm run seed` wipes the database and reloads the demo data.
 
 ## Demo logins (staff portal: `/admin`)
 
@@ -61,22 +62,21 @@ Invoices (room / restaurant / bar) with print view, payments received by method,
 ### System
 Settings (resort profile, website hero text, tax / service charge, payroll rates), users & roles, audit log.
 
-## Deploying with a domain
+## Deploying (Vercel + Neon, free)
 
-The server keeps its data in a SQLite file, so it must run on an **always-on host with a persistent disk**. The client is a static site and can live anywhere (Vercel, Netlify, or the same server).
+The website is a static build and the API runs as a Vercel serverless function (`api/index.js`), both from this one repository. Data lives in a Neon Postgres database.
 
-### Option A - one server for everything (simplest)
-Railway, Render, Fly.io, a VPS, or any Docker host. The included `Dockerfile` builds the site and runs the API on port 4000 serving both.
-
-- **Render**: click *New > Blueprint*, pick this repo - `render.yaml` sets up the service with a 1 GB disk at `/app/server/data`.
-- **Railway**: *New project > Deploy from GitHub*, add a Volume mounted at `/app/server/data`, set `JWT_SECRET`.
-- **VPS / cPanel with Node 24**: `npm install && npm run build && npm start` under pm2, reverse-proxied by nginx/Caddy with HTTPS.
+1. Create a free Postgres database at https://neon.tech and copy its connection string.
+2. On https://vercel.com click **Add New > Project**, import `Afridh/Janapriya-Resort` and keep the root directory as `/` (do not pick `client` or `server`).
+3. Under **Environment Variables** add:
+   - `DATABASE_URL` = the Neon connection string
+   - `JWT_SECRET` = any long random string
+4. Click **Deploy**. Then run `npm run seed` locally once with the same `DATABASE_URL` in `.env` to load the demo data (or create everything by hand in the portal).
+5. Add your domain under the project's **Settings > Domains**.
 
 Customers book at `https://yourdomain/book`, staff sign in at `https://yourdomain/admin`.
 
-### Option B - client on Vercel, API elsewhere
-1. Deploy the API with Option A first and note its URL (for example `https://janapriya-api.onrender.com`).
-2. In Vercel's *Git Import* dialog choose **only `client`** (do not import `server` - serverless has no persistent disk).
-3. Set the environment variable `VITE_API_URL` to the API URL from step 1, then deploy. `client/vercel.json` already handles the SPA routing.
+### Other hosts
+The included `Dockerfile` runs the API and website in one container on Railway, Render, Fly.io or a VPS. Set `DATABASE_URL` and `JWT_SECRET` as environment variables; no disk is needed because the data is in Neon.
 
-Environment variables for the server: `PORT` (default 4000), `JWT_SECRET` (set a strong value in production), `DB_PATH`.
+Environment variables: `DATABASE_URL` (required), `JWT_SECRET` (required in production), `PORT` (default 4000).
