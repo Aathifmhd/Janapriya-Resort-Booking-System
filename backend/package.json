@@ -3,7 +3,7 @@
   "version": "2.0.0",
   "private": true,
   "type": "module",
-  "description": "Janapriya Resort API: Express 5 + PostgreSQL (Neon)",
+  "description": "Janapriya Resort API: Express 5 + PostgreSQL (Supabase)",
   "main": "src/index.js",
   "engines": { "node": ">=22" },
   "scripts": {

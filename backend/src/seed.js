@@ -1,5 +1,5 @@
 import bcrypt from 'bcryptjs';
-import { pool, all, get, run, insert, setSetting, transaction, ensureSchema, todayLocal } from './db.js';
+import { pool, all, get, run, insert, setSetting, transaction, ensureSchema, todayLocal, APP_TABLES } from './db.js';
 
 const RESET = process.argv.includes('--reset');
 
@@ -8,12 +8,10 @@ function d(offsetDays) {
 }
 
 export async function seedIfEmpty() {
-  if (RESET) {
-    await pool.query('DROP SCHEMA public CASCADE; CREATE SCHEMA public;');
-    await pool.query((await import('./db.js')).SCHEMA);
-  } else {
-    await ensureSchema();
-  }
+  // Drop only this app's tables: on Supabase the public schema also holds the grants Supabase's own
+  // services rely on, and possibly other tables, which dropping the whole schema would destroy.
+  if (RESET) await pool.query(`DROP TABLE IF EXISTS ${APP_TABLES.join(', ')} CASCADE`);
+  await ensureSchema();
   const has = (await get('SELECT COUNT(*) AS c FROM users')).c;
   if (has > 0) return false;
 

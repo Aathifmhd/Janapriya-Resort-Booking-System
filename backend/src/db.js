@@ -1,4 +1,4 @@
-// Postgres data layer (Neon). Same helper API as before, but every helper is async.
+// Postgres data layer (Supabase, or any Postgres). Same helper API as before, but every helper is async.
 // Inside transaction(fn) all helpers automatically use the transaction's client.
 import pg from 'pg';
 import { AsyncLocalStorage } from 'node:async_hooks';
@@ -8,14 +8,26 @@ const { Pool, types } = pg;
 types.setTypeParser(20, (v) => parseInt(v, 10));
 types.setTypeParser(1700, (v) => parseFloat(v));
 
-if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL is not set (Neon Postgres connection string)');
+// POSTGRES_URL is the name Vercel's Supabase integration uses.
+const DATABASE_URL = process.env.DATABASE_URL || process.env.POSTGRES_URL;
+if (!DATABASE_URL) throw new Error('DATABASE_URL is not set (Supabase / Postgres connection string)');
 
-export const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: /sslmode=/.test(process.env.DATABASE_URL) ? undefined : { rejectUnauthorized: false },
-  max: process.env.VERCEL ? 2 : 8,
-  idleTimeoutMillis: 10000,
-});
+export const pool = new Pool({ ...connectionConfig(DATABASE_URL), max: process.env.VERCEL ? 2 : 8, idleTimeoutMillis: 10000 });
+
+/**
+ * Connection string and SSL options. Connections are always encrypted. The server certificate is
+ * checked only when `ca` (DATABASE_CA_CERT) is given or the URL asks for verify-full: Supabase signs
+ * its certificates with its own CA (Database settings > SSL configuration), which Node doesn't trust.
+ */
+export function connectionConfig(url, ca = process.env.DATABASE_CA_CERT) {
+  // an sslmode in the URL would override the `ssl` option, so drop it when setting `ssl` ourselves
+  const withoutSslMode = () => url.replace(/([?&])sslmode=[^&]*&?/, '$1').replace(/[?&]$/, '');
+  if (ca) return { connectionString: withoutSslMode(), ssl: { ca: ca.replace(/\\n/g, '\n') } };
+  if (!/[?&]sslmode=/.test(url)) return { connectionString: url, ssl: { rejectUnauthorized: false } };
+  // pg treats sslmode=require as verify-full, which Supabase's CA fails; ask for libpq's meaning (encrypt, don't verify)
+  if (/@[^/]*\.supabase\.(co|com)(:\d+)?\//.test(url) && !/[?&]uselibpqcompat=/.test(url)) return { connectionString: `${url}&uselibpqcompat=true` };
+  return { connectionString: url };
+}
 
 const als = new AsyncLocalStorage();
 const conn = () => als.getStore() || pool;
@@ -284,9 +296,22 @@ CREATE INDEX IF NOT EXISTS idx_stock_item ON stock_movements(inventory_item_id);
 CREATE INDEX IF NOT EXISTS idx_rate_limit_hits ON rate_limit_hits(bucket, ip, created_at);
 `;
 
+/** Every table this app creates. `seed --reset` drops exactly these. */
+export const APP_TABLES = [...SCHEMA.matchAll(/CREATE TABLE IF NOT EXISTS (\w+)/g)].map((m) => m[1]);
+
+// Row Level Security with no policies keeps these tables out of Supabase's auto-generated Data API,
+// which anyone holding the project's public anon key could otherwise use to read them. The app
+// connects as the tables' owner, which RLS doesn't restrict. Only tables still without RLS are altered.
+const ENABLE_RLS = `DO $$ DECLARE t text; BEGIN
+  FOR t IN SELECT c.relname FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = current_schema() AND c.relkind = 'r' AND NOT c.relrowsecurity
+      AND c.relname = ANY (ARRAY[${APP_TABLES.map((t) => `'${t}'`).join(',')}])
+  LOOP EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t); END LOOP;
+END $$;`;
+
 let schemaReady = null;
 /** Create tables if they don't exist (runs once per process). */
 export function ensureSchema() {
-  if (!schemaReady) schemaReady = pool.query(SCHEMA).catch((e) => { schemaReady = null; throw e; });
+  if (!schemaReady) schemaReady = pool.query(SCHEMA + ENABLE_RLS).catch((e) => { schemaReady = null; throw e; });
   return schemaReady;
 }

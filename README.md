@@ -2,7 +2,7 @@
 
 A complete, single-install management system for Janapriya Resort covering the **public booking website**, **front desk**, **restaurant & bar POS**, **inventory with empty-bottle tracking**, **HR & payroll**, and **finance**.
 
-- Backend: Node.js 22+ + Express 5 + PostgreSQL (Neon serverless Postgres, free tier)
+- Backend: Node.js 22+ + Express 5 + PostgreSQL (Supabase, free tier; any Postgres works)
 - Frontend: React 18 + Vite + Tailwind CSS 4 + Framer Motion + Recharts
 - Auth: JWT with role-based access per module
 
@@ -22,7 +22,7 @@ Each folder is a standalone Node project: you can `cd` into it and use `npm inst
 
 ```bash
 npm install                                # installs the root tool plus backend/ and frontend/ packages
-copy backend\.env.example backend\.env     # then paste your Neon DATABASE_URL and a JWT_SECRET into backend/.env
+copy backend\.env.example backend\.env     # then paste your Supabase DATABASE_URL and a JWT_SECRET into backend/.env
 npm run seed                               # creates the tables and loads demo data (first time only)
 npm run dev                                # API on http://localhost:4000, website on http://localhost:5173
 ```
@@ -74,14 +74,14 @@ Invoices (room / restaurant / bar) with print view, payments received by method,
 ### System
 Settings (resort profile, website hero text, tax / service charge, payroll rates), users & roles, audit log.
 
-## Deploying (Vercel + Neon, free)
+## Deploying (Vercel + Supabase, free)
 
-One Vercel project runs both folders as [Vercel Services](https://vercel.com/docs/services) (`vercel.json`). `frontend/` is built with Vite and serves the website on `/`. `backend/` runs the Express app (`backend/src/app.js`) as a function on `/api/*`. Both share one domain, so the website calls the API without any extra setup. Data lives in a Neon Postgres database.
+One Vercel project runs both folders as [Vercel Services](https://vercel.com/docs/services) (`vercel.json`). `frontend/` is built with Vite and serves the website on `/`. `backend/` runs the Express app (`backend/src/app.js`) as a function on `/api/*`. Both share one domain, so the website calls the API without any extra setup. Data lives in a Supabase Postgres database.
 
-1. Create a free Postgres database at https://neon.tech and copy its connection string.
+1. Create a free project at https://supabase.com. Click **Connect**, choose **Transaction pooler**, copy the connection string and replace `[YOUR-PASSWORD]` with the database password.
 2. On https://vercel.com click **Add New > Project**, import `Aathifmhd/Janapriya-Resort-Booking-System` and keep the root directory as `/` (do not pick `frontend` or `backend`; `vercel.json` points at both).
 3. Under **Environment Variables** add these (both services can read them):
-   - `DATABASE_URL` = the Neon connection string
+   - `DATABASE_URL` = the Supabase transaction pooler connection string (if you connected Supabase through Vercel's Supabase integration instead, its `POSTGRES_URL` is used automatically)
    - `JWT_SECRET` = any long random string
 4. Click **Deploy**. Then run `npm run seed` locally once with the same `DATABASE_URL` in `backend/.env` to load the demo data (or create everything by hand in the portal).
 5. Add your domain under the project's **Settings > Domains**.
@@ -90,9 +90,15 @@ Vercel Services is in Beta. Push to a branch first and check its Preview deploym
 
 Customers book at `https://yourdomain/book`, staff sign in at `https://yourdomain/admin`.
 
-### Other hosts
-The included `Dockerfile` builds `frontend/` and runs `backend/` in one container on Railway, Render, Fly.io or a VPS. Set `DATABASE_URL` and `JWT_SECRET` as environment variables; no disk is needed because the data is in Neon.
+### Supabase notes
+- **Which connection string:** use the **Transaction pooler** (port 6543) on Vercel. The **Session pooler** (port 5432 on the same pooler host) also works for `npm run dev`, Docker and seeding. The direct connection (`db.<project>.supabase.co`) only works over IPv6 on the Free and Pro plans, so prefer the pooler.
+- **SSL:** connections are encrypted. To also verify Supabase's certificate, set `DATABASE_CA_CERT` to the CA certificate from **Database settings > SSL configuration**.
+- **Data API:** the app turns on Row Level Security for its tables with no policies, so Supabase's auto-generated Data API can't read them with the project's public anon key. The backend connects as the tables' owner and isn't affected. Only add RLS policies if you mean to publish that data.
+- **Seeding:** `npm run seed` drops and recreates only this app's tables. Other tables in the Supabase project are left alone.
 
-Environment variables: `DATABASE_URL` (required), `JWT_SECRET` (required), `PORT` (default 4000).
+### Other hosts
+The included `Dockerfile` builds `frontend/` and runs `backend/` in one container on Railway, Render, Fly.io or a VPS. Set `DATABASE_URL` and `JWT_SECRET` as environment variables; no disk is needed because the data is in Supabase.
+
+Environment variables: `DATABASE_URL` (required; `POSTGRES_URL` is used if it's missing), `JWT_SECRET` (required), `DATABASE_CA_CERT` (optional), `PORT` (default 4000).
 
 Dates ("today", reports, invoice dates) follow Sri Lanka time. To change the time zone, edit `TIMEZONE` in `backend/src/db.js` and `frontend/src/lib/format.js`.
