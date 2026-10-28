@@ -79,7 +79,7 @@ Settings (resort profile, website hero text, tax / service charge, payroll rates
 One Vercel project runs both folders as [Vercel Services](https://vercel.com/docs/services) (`vercel.json`). `frontend/` is built with Vite and serves the website on `/`. `backend/` runs the Express app (`backend/src/app.js`) as a function on `/api/*`. Both share one domain, so the website calls the API without any extra setup. Data lives in a Neon Postgres database.
 
 1. Create a free Postgres database at https://neon.tech and copy its connection string.
-2. On https://vercel.com click **Add New > Project**, import `Afridh/Janapriya-Resort` and keep the root directory as `/` (do not pick `frontend` or `backend`; `vercel.json` points at both).
+2. On https://vercel.com click **Add New > Project**, import `Aathifmhd/Janapriya-Resort-Booking-System` and keep the root directory as `/` (do not pick `frontend` or `backend`; `vercel.json` points at both).
 3. Under **Environment Variables** add these (both services can read them):
    - `DATABASE_URL` = the Neon connection string
    - `JWT_SECRET` = any long random string
