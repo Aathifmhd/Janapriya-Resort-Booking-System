@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: janapriya-resort
+    runtime: docker
+    plan: starter
+    healthCheckPath: /api/health
+    envVars:
+      - key: JWT_SECRET
+        generateValue: true
+    disk:
+      name: data
+      mountPath: /app/server/data
+      sizeGB: 1

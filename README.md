@@ -61,13 +61,22 @@ Invoices (room / restaurant / bar) with print view, payments received by method,
 ### System
 Settings (resort profile, website hero text, tax / service charge, payroll rates), users & roles, audit log.
 
-## Configuration
-
-Environment variables (optional): `PORT` (default 4000), `JWT_SECRET` (set a strong value in production), `DB_PATH`.
-
 ## Deploying with a domain
 
-1. `npm install && npm run build` on the server.
-2. Run `npm start` under a process manager (pm2, NSSM on Windows, or systemd).
-3. Point your domain at the server and put it behind HTTPS (Caddy or nginx reverse proxy to port 4000).
-4. Customers book at `https://yourdomain/book`; staff sign in at `https://yourdomain/admin`.
+The server keeps its data in a SQLite file, so it must run on an **always-on host with a persistent disk**. The client is a static site and can live anywhere (Vercel, Netlify, or the same server).
+
+### Option A - one server for everything (simplest)
+Railway, Render, Fly.io, a VPS, or any Docker host. The included `Dockerfile` builds the site and runs the API on port 4000 serving both.
+
+- **Render**: click *New > Blueprint*, pick this repo - `render.yaml` sets up the service with a 1 GB disk at `/app/server/data`.
+- **Railway**: *New project > Deploy from GitHub*, add a Volume mounted at `/app/server/data`, set `JWT_SECRET`.
+- **VPS / cPanel with Node 24**: `npm install && npm run build && npm start` under pm2, reverse-proxied by nginx/Caddy with HTTPS.
+
+Customers book at `https://yourdomain/book`, staff sign in at `https://yourdomain/admin`.
+
+### Option B - client on Vercel, API elsewhere
+1. Deploy the API with Option A first and note its URL (for example `https://janapriya-api.onrender.com`).
+2. In Vercel's *Git Import* dialog choose **only `client`** (do not import `server` - serverless has no persistent disk).
+3. Set the environment variable `VITE_API_URL` to the API URL from step 1, then deploy. `client/vercel.json` already handles the SPA routing.
+
+Environment variables for the server: `PORT` (default 4000), `JWT_SECRET` (set a strong value in production), `DB_PATH`.

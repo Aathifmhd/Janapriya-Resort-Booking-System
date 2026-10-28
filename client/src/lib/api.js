@@ -1,3 +1,7 @@
+// Base URL of the API server. Empty = same origin (dev proxy / single-server deploy).
+// On Vercel set VITE_API_URL=https://your-api-host (no trailing slash).
+export const API_BASE = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
+
 const TOKEN_KEY = 'jr_token';
 const USER_KEY = 'jr_user';
 
@@ -22,7 +26,7 @@ async function request(method, url, body, opts = {}) {
   const headers = { 'Content-Type': 'application/json' };
   const token = getToken();
   if (token) headers.Authorization = `Bearer ${token}`;
-  const res = await fetch(url, { method, headers, body: body !== undefined ? JSON.stringify(body) : undefined });
+  const res = await fetch(url.startsWith('/') ? API_BASE + url : url, { method, headers, body: body !== undefined ? JSON.stringify(body) : undefined });
   if (res.status === 401 && !opts.noRedirect && !url.includes('/auth/login')) {
     clearSession();
     if (window.location.pathname.startsWith('/admin') && !window.location.pathname.startsWith('/admin/login')) {
