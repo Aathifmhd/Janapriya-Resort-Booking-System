@@ -2,23 +2,14 @@
   "name": "janapriya-resort",
   "version": "2.0.0",
   "private": true,
-  "type": "module",
-  "description": "Janapriya Resort - Complete Resort, Restaurant & Bar Management System",
+  "description": "Janapriya Resort - Complete Resort, Restaurant & Bar Management System (frontend/ + backend/)",
   "engines": { "node": ">=22" },
   "scripts": {
-    "postinstall": "npm --prefix client install",
-    "dev": "concurrently -n server,client -c blue,green \"npm run dev:server\" \"npm --prefix client run dev\"",
-    "dev:server": "node --env-file=.env --watch server/src/index.js",
-    "build": "npm --prefix client run build",
-    "start": "node --env-file=.env server/src/index.js",
-    "seed": "node --env-file=.env server/src/seed.js --reset"
-  },
-  "dependencies": {
-    "bcryptjs": "^3.0.2",
-    "cors": "^2.8.5",
-    "express": "^5.1.0",
-    "jsonwebtoken": "^9.0.2",
-    "pg": "^8.16.3"
+    "postinstall": "npm --prefix backend install && npm --prefix frontend install",
+    "dev": "concurrently -n backend,frontend -c blue,green \"npm --prefix backend run dev\" \"npm --prefix frontend run dev\"",
+    "build": "npm --prefix frontend run build",
+    "start": "npm --prefix backend start",
+    "seed": "npm --prefix backend run seed"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"

@@ -1,0 +1,21 @@
+{
+  "name": "janapriya-backend",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Janapriya Resort API: Express 5 + PostgreSQL (Neon)",
+  "main": "src/index.js",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "dev": "node --env-file=.env --watch src/index.js",
+    "start": "node --env-file=.env src/index.js",
+    "seed": "node --env-file=.env src/seed.js --reset"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.2",
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "pg": "^8.16.3"
+  }
+}
