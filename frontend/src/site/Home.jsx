@@ -6,12 +6,12 @@ import { api } from '../lib/api';
 import { money, today, addDays } from '../lib/format';
 import { Reveal } from '../components/ui';
 import { useResortInfo } from './SiteLayout';
-
-const HERO = 'https://images.unsplash.com/photo-1540541338287-41700207dee6?w=2000&q=80';
+import { HERO_SLIDES, HeroImages, useSlideshow } from './HeroSlideshow';
 
 export default function Home() {
   const info = useResortInfo();
   const nav = useNavigate();
+  const slide = useSlideshow(HERO_SLIDES.length);
   const [types, setTypes] = useState([]);
   const [form, setForm] = useState({ check_in: addDays(today(), 1), check_out: addDays(today(), 3), adults: 2, children: 0 });
   const heroRef = useRef(null);
@@ -27,8 +27,8 @@ export default function Home() {
     <div>
       {/* HERO */}
       <section ref={heroRef} className="relative h-[100svh] min-h-[640px] overflow-hidden flex items-center">
-        <motion.div style={{ y }} className="absolute inset-0">
-          <img src={HERO} alt="" className="h-full w-full object-cover scale-110" />
+        <motion.div style={{ y }} className="absolute inset-0 bg-brand-950">
+          <HeroImages slides={HERO_SLIDES} index={slide} />
           <div className="absolute inset-0 bg-gradient-to-b from-brand-950/70 via-brand-950/30 to-sand-50" />
         </motion.div>
         <motion.div style={{ opacity }} className="relative max-w-7xl mx-auto px-5 w-full pt-20">
