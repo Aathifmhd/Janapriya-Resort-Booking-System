@@ -28,7 +28,7 @@ export default function Login() {
         <div className="relative h-full flex flex-col justify-between p-12 text-white">
           <Link to="/" className="inline-flex items-center gap-2 text-sm text-white/70 hover:text-white"><ArrowLeft size={16} /> Back to website</Link>
           <div>
-            <div className="h-14 w-14 rounded-2xl bg-white/10 backdrop-blur flex items-center justify-center mb-6"><span className="font-display text-gold-300 text-3xl font-bold">J</span></div>
+            <div className="h-14 w-14 rounded-2xl bg-white/10 backdrop-blur flex items-center justify-center mb-6"><span className="font-display text-sand-300 text-3xl font-bold">J</span></div>
             <h1 className="font-display text-5xl leading-tight">Janapriya Resort<br />Management System</h1>
             <p className="text-white/70 mt-4 max-w-md">Rooms, restaurant, bar, stock, staff and finance - all in one place.</p>
           </div>

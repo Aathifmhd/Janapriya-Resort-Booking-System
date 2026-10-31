@@ -3,41 +3,56 @@
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-display: "Playfair Display", Georgia, serif;
+  --font-luxe: "Cinzel", "Playfair Display", Georgia, serif;
 
-  --color-brand-50: #f0fdfa;
-  --color-brand-100: #ccfbf1;
-  --color-brand-200: #99f6e4;
-  --color-brand-300: #5eead4;
-  --color-brand-400: #2dd4bf;
-  --color-brand-500: #14b8a6;
-  --color-brand-600: #0d9488;
-  --color-brand-700: #0f766e;
-  --color-brand-800: #115e59;
-  --color-brand-900: #134e4a;
-  --color-brand-950: #042f2e;
+  /* brand: the site palette (linen #f9f8f6, oat #efe9e3, taupe #d9cfc7, tan #c9b59c are steps 50-300),
+     carried on into darker taupes of the same hue for text, icons and buttons */
+  --color-brand-50: #f9f8f6;
+  --color-brand-100: #efe9e3;
+  --color-brand-200: #d9cfc7;
+  --color-brand-300: #c9b59c;
+  --color-brand-400: #b09a7e;
+  --color-brand-500: #957f65;
+  --color-brand-600: #7a6651;
+  --color-brand-700: #615140;
+  --color-brand-800: #4a3e32;
+  --color-brand-900: #342c24;
+  --color-brand-950: #221d18;
 
-  --color-gold-300: #fcd34d;
-  --color-gold-400: #fbbf24;
-  --color-gold-500: #f59e0b;
-  --color-gold-600: #d97706;
+  /* accent: the palette's tan direction; tan (300) fills the main call-to-action buttons */
+  --color-accent-100: #efe9e3;
+  --color-accent-200: #d9cfc7;
+  --color-accent-300: #c9b59c;
+  --color-accent-400: #b09a7e;
+  --color-accent-500: #957f65;
+  --color-accent-600: #7a6651;
+  --color-accent-700: #615140;
 
-  --color-sand-50: #fdfbf7;
-  --color-sand-100: #f8f3ea;
-  --color-sand-200: #efe6d6;
-  --color-sand-300: #e3d5bd;
+  /* sand: the palette's four colours by name, for backgrounds, bands, borders and fine details */
+  --color-sand-50: #f9f8f6;
+  --color-sand-100: #efe9e3;
+  --color-sand-200: #d9cfc7;
+  --color-sand-300: #c9b59c;
 
   --color-series-1: #2a78d6;
   --color-series-2: #eb6834;
   --color-series-3: #1baf7a;
   --color-series-4: #eda100;
 
-  --animate-float: float 6s ease-in-out infinite;
+  /* drift: a soft glow wanders slowly about; sweep: a band of light crosses a surface, then rests */
+  --animate-drift: drift 20s ease-in-out infinite alternate;
+  --animate-sweep: sweep 7s ease-in-out infinite;
   --animate-shimmer: shimmer 2.2s linear infinite;
   --animate-pulse-soft: pulseSoft 2s ease-in-out infinite;
 
-  @keyframes float {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-12px); }
+  @keyframes drift {
+    0% { transform: translate3d(0, 0, 0) scale(1); }
+    50% { transform: translate3d(25%, 15%, 0) scale(1.12); }
+    100% { transform: translate3d(-15%, 25%, 0) scale(0.95); }
+  }
+  @keyframes sweep {
+    0% { transform: translateX(0) skewX(-20deg); }
+    55%, 100% { transform: translateX(450%) skewX(-20deg); }
   }
   @keyframes shimmer {
     0% { background-position: -200% 0; }
@@ -53,41 +68,79 @@ html { scroll-behavior: smooth; }
 body { @apply bg-sand-50 text-slate-800 font-sans antialiased; }
 
 .font-display { font-family: var(--font-display); }
+/* public website: type modelled on ultimacollection.com. Its headings are Kepler Light, a paid Adobe font, so
+   headings use the closest free match (Noto Serif Display Light, slightly narrowed); text uses Montserrat as theirs does. */
+.site { --font-sans: "Montserrat", ui-sans-serif, system-ui, sans-serif; --font-display: "Noto Serif Display", Georgia, serif; font-family: var(--font-sans); }
+.site .font-display { font-weight: 300; font-stretch: 87.5%; }
+/* public website: Tailwind's slate greys have a blue tint, so here they come from the palette instead: the light ones
+   (fills, borders, dividers) are its four colours and the text greys its darker taupes (the staff portal keeps slate).
+   color is set again so text inherited from body picks them up. */
+.site {
+  --color-slate-50: var(--color-sand-50);
+  --color-slate-100: var(--color-sand-100);
+  --color-slate-200: var(--color-sand-200);
+  --color-slate-300: var(--color-sand-300);
+  --color-slate-400: var(--color-brand-500);
+  --color-slate-500: var(--color-brand-600);
+  --color-slate-600: var(--color-brand-700);
+  --color-slate-700: var(--color-brand-800);
+  --color-slate-800: var(--color-brand-900);
+  --color-slate-900: var(--color-brand-950);
+  --color-slate-950: var(--color-brand-950);
+  color: var(--color-slate-800);
+}
 
 /* scrollbars */
 *::-webkit-scrollbar { width: 8px; height: 8px; }
 *::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 8px; }
 *::-webkit-scrollbar-track { background: transparent; }
+/* public website: no visible page scrollbar (wheel, keys and touch still scroll); set by SiteLayout */
+html.site-scroll { scrollbar-width: none; }
+html.site-scroll::-webkit-scrollbar { display: none; }
 
-/* glass + gradient helpers */
-.glass { @apply bg-white/70 backdrop-blur-xl border border-white/40 shadow-lg shadow-slate-900/5; }
-.gradient-text { background: linear-gradient(90deg, #fcd34d, #f59e0b, #fcd34d); background-size: 200% auto; -webkit-background-clip: text; background-clip: text; color: transparent; animation: shimmer 4s linear infinite; }
-.card { @apply bg-white rounded-2xl border border-slate-200/80 shadow-sm; }
-.input { @apply rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 outline-none transition focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 placeholder:text-slate-400 disabled:bg-slate-50 disabled:text-slate-500; }
-.label { @apply block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1.5; }
 @utility btn { @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none cursor-pointer; }
-.btn-primary { @apply btn bg-brand-700 text-white hover:bg-brand-800 shadow-md shadow-brand-700/20; }
-.btn-gold { @apply btn bg-gold-500 text-slate-900 hover:bg-gold-400 shadow-md shadow-gold-500/30; }
-.btn-secondary { @apply btn bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300; }
-.btn-ghost { @apply btn text-slate-600 hover:bg-slate-100; }
-.btn-danger { @apply btn bg-rose-600 text-white hover:bg-rose-700; }
-.btn-sm { @apply px-3 py-1.5 text-xs rounded-lg; }
 
-.nav-link { @apply flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-slate-400 transition hover:bg-white/5 hover:text-white; }
-.nav-link.active { @apply bg-brand-500/15 text-brand-300; }
+/* Shared component classes sit in Tailwind's components layer so that a utility on the same element
+   (px-8, text-rose-600, text-right on a table header...) overrides them; unlayered they would beat every utility. */
+@layer components {
+  /* glass + gradient helpers */
+  .glass { @apply bg-white/70 backdrop-blur-xl border border-white/40 shadow-lg shadow-slate-900/5; }
+  .gradient-text { background: linear-gradient(90deg, #efe9e3, #c9b59c, #efe9e3); background-size: 200% auto; -webkit-background-clip: text; background-clip: text; color: transparent; animation: shimmer 4s linear infinite; }
+  .card { @apply bg-white rounded-2xl border border-slate-200/80 shadow-sm; }
+  .input { @apply rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 outline-none transition focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 placeholder:text-slate-400 disabled:bg-slate-50 disabled:text-slate-500; }
+  .label { @apply block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1.5; }
+  .btn-primary { @apply btn bg-brand-700 text-white hover:bg-brand-800 shadow-md shadow-brand-700/20; }
+  .btn-accent { @apply btn bg-accent-300 text-brand-950 hover:bg-accent-400 shadow-md shadow-brand-900/10; }
+  .btn-outline-light { @apply btn border border-white/70 text-white hover:bg-white hover:text-brand-950; }
+  .btn-secondary { @apply btn bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300; }
+  .btn-ghost { @apply btn text-slate-600 hover:bg-slate-100; }
+  .btn-danger { @apply btn bg-rose-600 text-white hover:bg-rose-700; }
+  .btn-sm { @apply px-3 py-1.5 text-xs rounded-lg; }
+  /* public website: square "box" buttons in formal Cinzel capitals (the staff portal keeps Inter and rounded buttons) */
+  .site :is(.btn, .btn-primary, .btn-accent, .btn-outline-light, .btn-secondary, .btn-ghost, .btn-danger) { font-family: var(--font-luxe); font-weight: 600; text-transform: uppercase; letter-spacing: 0.14em; border-radius: 0; }
+  /* public website: a soft sheen sweeps across the accent buttons on hover (not for visitors who prefer reduced motion) */
+  .site .btn-accent { position: relative; overflow: hidden; isolation: isolate; }
+  .site .btn-accent::after { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; background: linear-gradient(115deg, transparent 30%, rgb(255 255 255 / 0.28) 50%, transparent 70%); transform: translateX(-110%); }
+  @media (prefers-reduced-motion: no-preference) {
+    .site .btn-accent:hover::after { transform: translateX(110%); transition: transform 0.9s cubic-bezier(0.22, 1, 0.36, 1); }
+  }
 
-.table-wrap { @apply overflow-x-auto rounded-2xl border border-slate-200 bg-white; }
-table.data { @apply w-full text-sm; }
-table.data thead th { @apply bg-slate-50 px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 border-b border-slate-200 whitespace-nowrap; }
-table.data tbody td { @apply px-4 py-3 border-b border-slate-100 align-middle; }
-table.data tbody tr:last-child td { @apply border-b-0; }
-table.data tbody tr { @apply transition hover:bg-brand-50/40; }
+  .nav-link { @apply flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-slate-400 transition hover:bg-white/5 hover:text-white; }
+  .nav-link.active { @apply bg-brand-500/15 text-brand-300; }
 
-.chip { @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold; }
+  .table-wrap { @apply overflow-x-auto rounded-2xl border border-slate-200 bg-white; }
+  table.data { @apply w-full text-sm; }
+  table.data thead th { @apply bg-slate-50 px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 border-b border-slate-200 whitespace-nowrap; }
+  table.data tbody td { @apply px-4 py-3 border-b border-slate-100 align-middle; }
+  table.data tbody tr:last-child td { @apply border-b-0; }
+  table.data tbody tr { @apply transition hover:bg-brand-50/40; }
 
-.room-tile { @apply relative rounded-2xl border-2 p-4 text-left transition cursor-pointer hover:-translate-y-0.5 hover:shadow-lg; }
+  .chip { @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold; }
 
-.skeleton { @apply rounded-xl bg-slate-200/70; background-image: linear-gradient(90deg, rgba(255,255,255,0) 0, rgba(255,255,255,.6) 50%, rgba(255,255,255,0) 100%); background-size: 200% 100%; animation: shimmer 1.6s linear infinite; }
+  .room-tile { @apply relative rounded-2xl border-2 p-4 text-left transition cursor-pointer hover:-translate-y-0.5 hover:shadow-lg; }
+
+  .skeleton { @apply rounded-xl bg-slate-200/70; background-image: linear-gradient(90deg, rgba(255,255,255,0) 0, rgba(255,255,255,.6) 50%, rgba(255,255,255,0) 100%); background-size: 200% 100%; animation: shimmer 1.6s linear infinite; }
+}
 
 @media print {
   .no-print { display: none !important; }

@@ -45,7 +45,7 @@ export function Modal({ open, onClose, title: t, children, size = 'md', footer }
   return (
     <AnimatePresence>
       {open && (
-        <motion.div className="fixed inset-0 z-[90] flex items-end sm:items-center justify-center p-0 sm:p-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+        <motion.div data-lenis-prevent className="fixed inset-0 z-[90] flex items-end sm:items-center justify-center p-0 sm:p-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
           <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={onClose} />
           <motion.div initial={{ opacity: 0, y: 30, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 20, scale: 0.98 }} transition={{ type: 'spring', stiffness: 300, damping: 28 }}
             className={`relative w-full ${sizes[size]} bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl max-h-[92vh] flex flex-col`}>

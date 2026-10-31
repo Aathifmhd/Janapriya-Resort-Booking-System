@@ -32,14 +32,14 @@ export default function Dining() {
 
       <div className="max-w-7xl mx-auto px-5 mt-14 grid sm:grid-cols-3 gap-5">
         {[['Breakfast', '7:00 - 10:30'], ['Lunch & Dinner', '12:00 - 22:30'], ['Sunset Bar', '16:00 - late']].map(([n, t], i) => (
-          <Reveal key={n} delay={i * 0.08}><div className="card p-5 flex items-center gap-4"><span className="h-11 w-11 rounded-2xl bg-brand-50 text-brand-700 flex items-center justify-center"><Clock size={20} /></span><div><div className="font-semibold text-slate-900">{n}</div><div className="text-sm text-slate-500">{t}</div></div></div></Reveal>
+          <Reveal key={n} delay={i * 0.08}><div className="card p-5 flex items-center gap-4"><span className="h-11 w-11 rounded-2xl bg-sand-100 text-brand-700 flex items-center justify-center"><Clock size={20} /></span><div><div className="font-semibold text-slate-900">{n}</div><div className="text-sm text-slate-500">{t}</div></div></div></Reveal>
         ))}
       </div>
 
       <section className="max-w-7xl mx-auto px-5 mt-20 grid lg:grid-cols-3 gap-10">
         <div className="lg:col-span-2">
           <Reveal className="flex items-end justify-between flex-wrap gap-4">
-            <div><span className="text-xs font-semibold uppercase tracking-[0.25em] text-brand-700">Our menu</span><h2 className="font-display text-4xl text-slate-900 mt-2">{tab === 'food' ? 'Kitchen' : 'Bar & Beverages'}</h2></div>
+            <div><span className="text-xs font-semibold uppercase tracking-[0.25em] text-accent-600">Our menu</span><h2 className="font-display text-4xl text-slate-900 mt-2">{tab === 'food' ? 'Kitchen' : 'Bar & Beverages'}</h2></div>
             <div className="inline-flex rounded-xl bg-sand-100 p-1">
               {['food', 'drinks'].map((t) => <button key={t} onClick={() => setTab(t)} className={`relative px-5 py-2 text-sm font-semibold rounded-lg transition ${tab === t ? 'text-brand-900' : 'text-slate-500'}`}>{tab === t && <motion.span layoutId="menu-tab" className="absolute inset-0 bg-white rounded-lg shadow" />}<span className="relative capitalize">{t}</span></button>)}
             </div>
@@ -72,7 +72,7 @@ export default function Dining() {
             <h3 className="font-display text-2xl text-slate-900">Reserve a table</h3>
             <p className="text-sm text-slate-500 mt-1">We'll confirm by phone within the hour.</p>
             {done ? (
-              <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="mt-6 rounded-2xl bg-emerald-50 text-emerald-800 p-5 text-sm">
+              <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="mt-6 rounded-2xl bg-accent-100 text-accent-700 p-5 text-sm">
                 <div className="font-semibold text-base">Request received!</div>
                 Thank you {form.guest_name}. Our team will call {form.phone} to confirm your table for {form.party_size} on {form.date} at {form.time}.
               </motion.div>

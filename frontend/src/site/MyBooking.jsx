@@ -36,7 +36,7 @@ export default function MyBooking() {
   return (
     <div className="pt-28 pb-10 max-w-3xl mx-auto px-5">
       <div className="text-center mb-10">
-        <span className="text-xs font-semibold uppercase tracking-[0.25em] text-brand-700">Manage</span>
+        <span className="text-xs font-semibold uppercase tracking-[0.25em] text-accent-600">Manage</span>
         <h1 className="font-display text-4xl sm:text-5xl text-slate-900 mt-2">My booking</h1>
         <p className="text-slate-500 mt-3">Enter your booking reference and the email or phone used when booking.</p>
       </div>
@@ -65,7 +65,7 @@ export default function MyBooking() {
               {b.folio_subtotal > b.subtotal && <div className="flex justify-between text-slate-600"><span>Other charges</span><span>{money(b.folio_subtotal - b.subtotal)}</span></div>}
               <div className="flex justify-between text-slate-600"><span>Taxes</span><span>{money(b.folio_tax)}</span></div>
               <div className="flex justify-between font-bold text-slate-900 text-base pt-2 border-t border-sand-300"><span>Total</span><span>{money(b.folio_total)}</span></div>
-              <div className="flex justify-between text-emerald-700"><span>Paid</span><span>{money(b.paid)}</span></div>
+              <div className="flex justify-between text-brand-700"><span>Paid</span><span>{money(b.paid)}</span></div>
               <div className="flex justify-between font-semibold text-slate-800"><span>Balance due</span><span>{money(b.balance)}</span></div>
             </div>
           </div>

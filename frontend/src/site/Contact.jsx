@@ -12,7 +12,7 @@ export default function Contact() {
         <Reveal>
           <div className="space-y-5">
             {[[MapPin, 'Address', info.address], [Phone, 'Phone / WhatsApp', info.phone], [Mail, 'Email', info.email], [Clock, 'Check-in / Check-out', `${info.check_in_time} / ${info.check_out_time}`]].map(([I, l, v]) => (
-              <div key={l} className="card p-5 flex items-start gap-4"><span className="h-11 w-11 shrink-0 rounded-2xl bg-brand-50 text-brand-700 flex items-center justify-center"><I size={20} /></span><div><div className="text-xs uppercase tracking-wider text-slate-400 font-semibold">{l}</div><div className="text-slate-800 font-medium mt-0.5">{v}</div></div></div>
+              <div key={l} className="card p-5 flex items-start gap-4"><span className="h-11 w-11 shrink-0 rounded-2xl bg-sand-100 text-brand-700 flex items-center justify-center"><I size={20} /></span><div><div className="text-xs uppercase tracking-wider text-slate-400 font-semibold">{l}</div><div className="text-slate-800 font-medium mt-0.5">{v}</div></div></div>
             ))}
           </div>
         </Reveal>

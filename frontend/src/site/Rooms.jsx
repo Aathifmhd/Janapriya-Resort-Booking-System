@@ -28,7 +28,7 @@ export default function Rooms() {
                   <span className="inline-flex items-center gap-1.5"><Maximize size={16} className="text-brand-700" /> {t.size_sqm} m²</span>
                 </div>
                 <ul className="grid grid-cols-2 gap-2 mt-6">
-                  {(t.amenities || []).map((a) => <li key={a} className="flex items-center gap-2 text-sm text-slate-700"><Check size={14} className="text-emerald-600" /> {a}</li>)}
+                  {(t.amenities || []).map((a) => <li key={a} className="flex items-center gap-2 text-sm text-slate-700"><Check size={14} className="text-accent-600" /> {a}</li>)}
                 </ul>
                 <div className="flex items-center gap-6 mt-8">
                   <div><div className="text-xs uppercase tracking-wider text-slate-400">From</div><div className="font-display text-3xl font-semibold text-brand-800">{money(t.base_rate, { decimals: 0 })}<span className="text-sm font-sans font-normal text-slate-400"> / night</span></div></div>

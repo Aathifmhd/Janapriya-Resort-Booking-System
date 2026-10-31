@@ -56,7 +56,7 @@ export default function Book() {
   return (
     <div className="pt-28 pb-10 max-w-6xl mx-auto px-5">
       <div className="text-center mb-10">
-        <span className="text-xs font-semibold uppercase tracking-[0.25em] text-brand-700">Reservations</span>
+        <span className="text-xs font-semibold uppercase tracking-[0.25em] text-accent-600">Reservations</span>
         <h1 className="font-display text-4xl sm:text-5xl text-slate-900 mt-2">Book your stay</h1>
       </div>
 
@@ -65,10 +65,10 @@ export default function Book() {
         {steps.map((s, i) => (
           <div key={s} className="flex items-center gap-2 sm:gap-4">
             <div className={`flex items-center gap-2 ${i <= step ? 'text-brand-800' : 'text-slate-400'}`}>
-              <motion.span animate={{ scale: i === step ? 1.1 : 1 }} className={`h-8 w-8 rounded-full flex items-center justify-center text-sm font-bold ${i < step ? 'bg-emerald-500 text-white' : i === step ? 'bg-brand-700 text-white shadow-lg shadow-brand-700/30' : 'bg-slate-200 text-slate-500'}`}>{i < step ? <Check size={14} /> : i + 1}</motion.span>
+              <motion.span animate={{ scale: i === step ? 1.1 : 1 }} className={`h-8 w-8 rounded-full flex items-center justify-center text-sm font-bold ${i < step ? 'bg-accent-600 text-white' : i === step ? 'bg-brand-700 text-white shadow-lg shadow-brand-700/30' : 'bg-slate-200 text-slate-500'}`}>{i < step ? <Check size={14} /> : i + 1}</motion.span>
               <span className="text-sm font-semibold hidden sm:inline">{s}</span>
             </div>
-            {i < steps.length - 1 && <div className={`h-0.5 w-6 sm:w-14 rounded ${i < step ? 'bg-emerald-500' : 'bg-slate-200'}`} />}
+            {i < steps.length - 1 && <div className={`h-0.5 w-6 sm:w-14 rounded ${i < step ? 'bg-accent-600' : 'bg-slate-200'}`} />}
           </div>
         ))}
       </div>
@@ -101,7 +101,7 @@ export default function Book() {
                 <div className="space-y-4">
                   {types?.map((t, i) => (
                     <motion.button key={t.id} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.07 }} disabled={!t.available} onClick={() => setSelected(t)}
-                      className={`w-full text-left flex flex-col sm:flex-row gap-4 rounded-3xl border-2 p-3 transition ${selected?.id === t.id ? 'border-brand-600 bg-brand-50/50 shadow-lg' : 'border-slate-200 hover:border-brand-300 bg-white'} ${!t.available ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                      className={`w-full text-left flex flex-col sm:flex-row gap-4 rounded-3xl border-2 p-3 transition ${selected?.id === t.id ? 'border-brand-600 bg-sand-100/60 shadow-lg' : 'border-slate-200 hover:border-brand-300 bg-white'} ${!t.available ? 'opacity-50 cursor-not-allowed' : ''}`}>
                       <img src={t.image_url} alt="" className="h-36 sm:h-32 sm:w-44 rounded-2xl object-cover" />
                       <div className="flex-1 min-w-0 py-1">
                         <div className="flex items-start justify-between gap-3">
@@ -110,7 +110,7 @@ export default function Book() {
                         </div>
                         <p className="text-sm text-slate-600 mt-2 line-clamp-2">{t.description}</p>
                         <div className="mt-2 text-xs font-semibold">
-                          {t.available ? <span className="text-emerald-700">{t.available_count} room{t.available_count > 1 ? 's' : ''} available</span> : !t.fits_guests ? <span className="text-amber-700">Too small for your party</span> : <span className="text-rose-600">Sold out for these dates</span>}
+                          {t.available ? <span className="text-brand-700">{t.available_count} room{t.available_count > 1 ? 's' : ''} available</span> : !t.fits_guests ? <span className="text-amber-700">Too small for your party</span> : <span className="text-rose-600">Sold out for these dates</span>}
                         </div>
                       </div>
                     </motion.button>
@@ -135,14 +135,14 @@ export default function Book() {
                   <Field label="Special requests" className="sm:col-span-2"><Textarea value={guest.special_requests} onChange={(e) => setGuest({ ...guest, special_requests: e.target.value })} placeholder="Early check-in, airport pickup, anniversary..." /></Field>
                 </div>
                 <p className="text-xs text-slate-500 mt-4">By booking you agree to our cancellation policy: free cancellation up to 48 hours before check-in. Payment is made at the resort (cash, card or bank transfer).</p>
-                <div className="mt-6 flex justify-end"><button className="btn-gold" onClick={submit} disabled={busy}>{busy && <Loader2 size={16} className="animate-spin" />}Confirm booking</button></div>
+                <div className="mt-6 flex justify-end"><button className="btn-accent" onClick={submit} disabled={busy}>{busy && <Loader2 size={16} className="animate-spin" />}Confirm booking</button></div>
               </Panel>
             )}
 
             {step === 3 && result && (
               <Panel key="done">
                 <div className="text-center py-6">
-                  <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 260, damping: 18 }} className="mx-auto h-20 w-20 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center"><PartyPopper size={36} /></motion.div>
+                  <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 260, damping: 18 }} className="mx-auto h-20 w-20 rounded-full bg-accent-100 text-accent-600 flex items-center justify-center"><PartyPopper size={36} /></motion.div>
                   <h2 className="font-display text-3xl text-slate-900 mt-5">Booking request received!</h2>
                   <p className="text-slate-600 mt-2">Your reference is</p>
                   <div className="font-mono text-3xl font-bold text-brand-800 mt-1 tracking-wider">{result.code}</div>

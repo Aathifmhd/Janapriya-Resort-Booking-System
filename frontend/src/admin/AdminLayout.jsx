@@ -64,7 +64,7 @@ export default function AdminLayout() {
   const Sidebar = (
     <div className="flex flex-col h-full">
       <div className="px-5 py-5 flex items-center gap-3 border-b border-white/5">
-        <div className="h-10 w-10 rounded-xl bg-brand-600 flex items-center justify-center shadow-lg shadow-brand-600/30"><span className="font-display text-gold-300 text-xl font-bold">J</span></div>
+        <div className="h-10 w-10 rounded-xl bg-sand-300 flex items-center justify-center shadow-lg shadow-sand-300/20"><span className="font-display text-brand-900 text-xl font-bold">J</span></div>
         <div className="leading-tight"><div className="font-display text-white text-lg">{settings?.resort_name || 'Janapriya'}</div><div className="text-[10px] uppercase tracking-[0.2em] text-slate-500">Staff Portal</div></div>
       </div>
       <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-5">
